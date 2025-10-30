@@ -1,9 +1,207 @@
+
 import 'package:flutter/material.dart';
+import 'package:pjt2/student/student_home.dart';
 import 'package:pjt2/lecturer/lecturer_home.dart';
-import 'student/student_home.dart';
-import 'staff/staff_home.dart';
+import 'package:pjt2/staff/staff_home.dart';
+
+// ----------------- AppData -----------------
+class AppData {
+  static Map<String, String>? currentStudentBooking;
+
+  static List<Map<String, String>> lecturerRequests = [];
+
+  static List<Map<String, String>> lecturerHistory = [
+    {
+      'room': 'Room A101',
+      'building': 'Building 1',
+      'timeslot': '13-15',
+      'date': '2025-10-23',
+      'time': '09:15',
+      'status': 'Approved',
+      'actionBy': 'Prof. A',
+      'actionTime': '11:30',
+      'requestedBy': 'Student A (ID-123)',
+    },
+    {
+      'room': 'Room B101',
+      'building': 'Building 2',
+      'timeslot': '15-17',
+      'date': '2025-10-23',
+      'time': '09:45',
+      'status': 'Rejected',
+      'actionBy': 'Prof. B',
+      'actionTime': '11:35',
+      'requestedBy': 'Student B (ID-456)',
+    },
+  ];
+
+  static List<Map<String, String>> studentHistory = [];
+
+  static Map<String, Map<String, String>> slotStatus = {
+    'Room X101': {
+      '8-10': 'Disabled',
+      '10-12': 'Disabled',
+      '13-15': 'Disabled',
+      '15-17': 'Disabled',
+    },
+    'Room A101': {
+      '8-10': 'Free',
+      '10-12': 'Free',
+      '13-15': 'Free',
+      '15-17': 'Pending', // example pending slot
+    },
+    'Room B103': {
+      '8-10': 'Free',
+      '10-12': 'Free',
+      '13-15': 'Free',
+      '15-17': 'Reserved',
+    },
+  };
+
+  static Map<String, String> roomBuildings = {
+    'Room X101': 'Building 6',
+    'Room A101': 'Building 1',
+    'Room B103': 'Building 2',
+  };
+
+  static String todayDate = "2025-10-23";
+
+  static String nowTime() => "10:00";
+
+  static bool hasActiveBookingToday() {
+    if (currentStudentBooking != null) return true;
+    for (var h in studentHistory) {
+      if (h['date'] == todayDate && h['status'] == 'Approved') return true;
+    }
+    return false;
+  }
+
+  static void makeStudentBooking(String room, String building, String timeSlot) {
+    final req = {
+      'room': room,
+      'building': building,
+      'timeslot': timeSlot,
+      'date': todayDate,
+      'time': nowTime(),
+      'requestedBy': 'Student A (ID-001)',
+    };
+    currentStudentBooking = req;
+    lecturerRequests.add(req);
+    slotStatus[room]?[timeSlot] = 'Pending';
+    roomBuildings[room] = building;
+  }
+
+  static String getSlotStatus(String room, String timeslot) {
+    if (!slotStatus.containsKey(room)) return 'Free';
+    return slotStatus[room]?[timeslot] ?? 'Free';
+  }
+
+  static void lecturerAction(int reqIndex, String action, String actionBy) {
+    final req = lecturerRequests.removeAt(reqIndex);
+    final hist = {
+      ...req,
+      'status': action,
+      'actionBy': actionBy,
+      'actionTime': nowTime(),
+    };
+    lecturerHistory.insert(0, hist);
+    studentHistory.insert(0, hist);
+
+    if (currentStudentBooking != null) {
+      final cur = currentStudentBooking!;
+      if (cur['room'] == req['room'] && cur['timeslot'] == req['timeslot']) {
+        currentStudentBooking = null;
+      }
+    }
+
+    final room = req['room']!;
+    final timeslot = req['timeslot']!;
+    if (action == 'Approved') {
+      slotStatus[room]?[timeslot] = 'Reserved';
+    } else {
+      slotStatus[room]?[timeslot] = 'Free';
+    }
+  }
+
+  static void staffAddRoom(String roomName, String building) {
+    if (!roomName.toLowerCase().startsWith('room ')) roomName = 'Room $roomName';
+    if (!building.toLowerCase().startsWith('building '))
+      building = 'Building $building';
+
+    if (slotStatus.containsKey(roomName)) return;
+    slotStatus[roomName] = {
+      '8-10': 'Free',
+      '10-12': 'Free',
+      '13-15': 'Free',
+      '15-17': 'Free',
+    };
+    roomBuildings[roomName] = building;
+  }
+
+  static void staffEditRoom(String oldName, String newName, String newBuilding) {
+    if (!newName.toLowerCase().startsWith('room ')) newName = 'Room $newName';
+    if (!newBuilding.toLowerCase().startsWith('building '))
+      newBuilding = 'Building $newBuilding';
+
+    if (oldName == newName) {
+      roomBuildings[oldName] = newBuilding;
+      return;
+    }
+
+    final map = slotStatus.remove(oldName);
+    if (map != null) {
+      slotStatus[newName] = map;
+      roomBuildings.remove(oldName);
+      roomBuildings[newName] = newBuilding;
+    } else {
+      slotStatus[newName] = {
+        '8-10': 'Free',
+        '10-12': 'Free',
+        '13-15': 'Free',
+        '15-17': 'Free',
+      };
+      roomBuildings[newName] = newBuilding;
+    }
+  }
+
+  static void staffToggleRoomDisabled(String roomName, bool disabled) {
+    if (!slotStatus.containsKey(roomName)) return;
+    final map = slotStatus[roomName]!;
+    map.forEach((k, v) {
+      map[k] = disabled ? 'Disabled' : 'Free';
+    });
+  }
+
+  // 🟢 NEW: Initialize any existing "Pending" slots as lecturerRequests
+  static void initializePendingRequests() {
+    for (var entry in slotStatus.entries) {
+      final room = entry.key;
+      final building = roomBuildings[room] ?? 'Building ?';
+      for (var slot in entry.value.entries) {
+        if (slot.value == 'Pending') {
+          final alreadyExists = lecturerRequests.any((r) =>
+              r['room'] == room &&
+              r['timeslot'] == slot.key &&
+              r['date'] == todayDate);
+          if (!alreadyExists) {
+            lecturerRequests.add({
+              'room': room,
+              'building': building,
+              'timeslot': slot.key,
+              'date': todayDate,
+              'time': nowTime(),
+              'requestedBy': 'Student (Example)',
+            });
+          }
+        }
+      }
+    }
+  }
+}
+// ----------------- end AppData -----------------
 
 void main() {
+  AppData.initializePendingRequests(); // 🟢 Auto-detect & load pending requests
   runApp(const MyApp());
 }
 
@@ -77,7 +275,6 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     final role = user['role'];
-
     if (role == 'student') {
       Navigator.pushReplacement(
         context,
@@ -175,8 +372,7 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                       ),
                       child: const Text('Sign in',
-                          style:
-                              TextStyle(fontSize: 18, color: Colors.white)),
+                          style: TextStyle(fontSize: 18, color: Colors.white)),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -222,10 +418,6 @@ class _RegisterPageState extends State<RegisterPage> {
 
   Future<void> _showMessage(String text) async {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
-  }
-
-  bool _usernameExists(String name) {
-    return false;
   }
 
   Future<void> _tryRegister() async {
@@ -294,11 +486,17 @@ class _RegisterPageState extends State<RegisterPage> {
                       style: TextStyle(color: Colors.black54)),
                   const SizedBox(height: 16),
                   _buildTextField(
-                      hint: 'username', obscure: false, controller: _usernameCtrl),
+                      hint: 'username',
+                      obscure: false,
+                      controller: _usernameCtrl),
                   _buildTextField(
-                      hint: 'password', obscure: true, controller: _passwordCtrl),
+                      hint: 'password',
+                      obscure: true,
+                      controller: _passwordCtrl),
                   _buildTextField(
-                      hint: 'confirm password', obscure: true, controller: _confirmCtrl),
+                      hint: 'confirm password',
+                      obscure: true,
+                      controller: _confirmCtrl),
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,

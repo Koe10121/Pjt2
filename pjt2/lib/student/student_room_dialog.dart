@@ -1,9 +1,7 @@
-
-
 import 'package:flutter/material.dart';
 
 class RoomUnavailableDialog extends StatelessWidget {
-  const RoomUnavailableDialog();
+  const RoomUnavailableDialog({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -13,12 +11,7 @@ class RoomUnavailableDialog extends StatelessWidget {
         "You cannot reserve this time slot because it's already reserved, pending, or disabled.",
       ),
       actions: [
-        TextButton(
-          onPressed: () {
-            Navigator.pop(context);
-          },
-          child: const Text("OK"),
-        ),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text("OK")),
       ],
     );
   }
@@ -27,10 +20,13 @@ class RoomUnavailableDialog extends StatelessWidget {
 class ConfirmBookingDialog extends StatelessWidget {
   final String roomName;
   final String timeSlot;
+  final VoidCallback onConfirm;
 
   const ConfirmBookingDialog({
+    super.key,
     required this.roomName,
     required this.timeSlot,
+    required this.onConfirm,
   });
 
   @override
@@ -47,21 +43,8 @@ class ConfirmBookingDialog extends StatelessWidget {
         ],
       ),
       actions: [
-        TextButton(
-          onPressed: () {
-            Navigator.pop(context);
-          },
-          child: const Text("Cancel"),
-        ),
-        TextButton(
-          onPressed: () {
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("Booking confirmed!")),
-            );
-          },
-          child: const Text("Confirm"),
-        ),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+        ElevatedButton(onPressed: onConfirm, child: const Text("Confirm")),
       ],
     );
   }
