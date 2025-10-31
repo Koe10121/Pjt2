@@ -6,6 +6,7 @@ import 'package:pjt2/staff/staff_home.dart';
 
 // ----------------- AppData -----------------
 class AppData {
+  static Map<String, String>? currentUser; // 🔹 store logged-in user info
   static Map<String, String>? currentStudentBooking;
 
   static List<Map<String, String>> lecturerRequests = [];
@@ -20,7 +21,7 @@ class AppData {
       'status': 'Approved',
       'actionBy': 'Prof. A',
       'actionTime': '11:30',
-      'requestedBy': 'Student A (ID-123)',
+      'requestedBy': 'Student A (ID-001)',
     },
     {
       'room': 'Room B101',
@@ -66,7 +67,13 @@ class AppData {
 
   static String todayDate = "2025-10-23";
 
-  static String nowTime() => "10:00";
+  // ✅ NowTime returns real current time
+  static String nowTime() {
+    final now = DateTime.now();
+    final hour = now.hour.toString().padLeft(2, '0');
+    final minute = now.minute.toString().padLeft(2, '0');
+    return "$hour:$minute";
+  }
 
   static bool hasActiveBookingToday() {
     if (currentStudentBooking != null) return true;
@@ -77,13 +84,14 @@ class AppData {
   }
 
   static void makeStudentBooking(String room, String building, String timeSlot) {
+    final currentName = currentUser?['displayName'] ?? 'Student (Unknown)';
     final req = {
       'room': room,
       'building': building,
       'timeslot': timeSlot,
       'date': todayDate,
       'time': nowTime(),
-      'requestedBy': 'Student A (ID-001)',
+      'requestedBy': currentName,
     };
     currentStudentBooking = req;
     lecturerRequests.add(req);
@@ -172,7 +180,6 @@ class AppData {
     });
   }
 
-  // 🟢 NEW: Initialize any existing "Pending" slots as lecturerRequests
   static void initializePendingRequests() {
     for (var entry in slotStatus.entries) {
       final room = entry.key;
@@ -201,7 +208,7 @@ class AppData {
 // ----------------- end AppData -----------------
 
 void main() {
-  AppData.initializePendingRequests(); // 🟢 Auto-detect & load pending requests
+  AppData.initializePendingRequests(); 
   runApp(const MyApp());
 }
 
@@ -275,6 +282,19 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     final role = user['role'];
+
+    // ✅ Store current user info globally
+    AppData.currentUser = {
+      'username': username,
+      'role': role ?? '',
+      'displayName': (role == 'student')
+          ? 'Student A (ID-001)'
+          : (role == 'lecturer')
+              ? 'Prof. A'
+              : 'Staff Member',
+    };
+
+    // ✅ Navigate by role
     if (role == 'student') {
       Navigator.pushReplacement(
         context,
@@ -503,8 +523,8 @@ class _RegisterPageState extends State<RegisterPage> {
                     height: 48,
                     child: ElevatedButton(
                       onPressed: _tryRegister,
-                      child: const Text('Register',
-                          style: TextStyle(fontSize: 18)),
+                      child:
+                          const Text('Register', style: TextStyle(fontSize: 18)),
                     ),
                   ),
                   const SizedBox(height: 12),
