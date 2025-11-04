@@ -4,7 +4,10 @@ import 'student_check_status.dart';
 import 'student_history.dart';
 
 class StudentHomePage extends StatefulWidget {
-  const StudentHomePage({super.key});
+  final int userId;
+  final String username;
+
+  const StudentHomePage({super.key, required this.userId, required this.username});
 
   @override
   State<StudentHomePage> createState() => _StudentHomePageState();
@@ -13,25 +16,19 @@ class StudentHomePage extends StatefulWidget {
 class _StudentHomePageState extends State<StudentHomePage> {
   int selectedIndex = 0;
 
-  final List<Widget> pages = const [
-    BrowseRoomPage(),
-    StudentCheckStatusPage(),
-    StudentHistoryPage(),
-  ];
-
-  void onItemTapped(int index) {
-    setState(() {
-      selectedIndex = index;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
+    final pages = [
+      BrowseRoomPage(userId: widget.userId),
+      StudentCheckStatusPage(userId: widget.userId),
+      StudentHistoryPage(userId: widget.userId),
+    ];
+
     return Scaffold(
       body: pages[selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: selectedIndex,
-        onTap: onItemTapped,
+        onTap: (index) => setState(() => selectedIndex = index),
         selectedItemColor: Colors.black,
         unselectedItemColor: Colors.grey,
         type: BottomNavigationBarType.fixed,
