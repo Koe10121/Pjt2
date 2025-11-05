@@ -7,7 +7,7 @@ class ApiService {
   // Android emulator -> 'http://10.0.2.2:3000'
   // iOS simulator    -> 'http://localhost:3000'
   // Real phone       -> 'http://<your-PC-IP>:3000'
-  static const base = 'http://172.25.6.73:3000';
+  static const base = 'http://192.168.1.105:3000';
 
   // 🧍 LOGIN
   static Future<Map<String, dynamic>?> login(String username, String password) async {
