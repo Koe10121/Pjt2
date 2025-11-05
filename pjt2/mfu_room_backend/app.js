@@ -65,11 +65,18 @@ app.get("/rooms", (req, res) => {
 app.get("/bookings/:userId", (req, res) => {
   const { userId } = req.params;
   const sql = `
-    SELECT b.id, b.timeslot, DATE_FORMAT(b.date, '%Y-%m-%d') AS date,
-           DATE_FORMAT(b.time, '%H:%i') AS time, b.status,
-           r.name AS room, r.building
+    SELECT 
+      b.id, 
+      b.timeslot, 
+      DATE_FORMAT(b.date, '%Y-%m-%d') AS date,
+      DATE_FORMAT(b.time, '%H:%i') AS time,
+      b.status,
+      r.name AS room, 
+      r.building,
+      u.username AS approved_by
     FROM bookings b
     JOIN rooms r ON b.room_id = r.id
+    LEFT JOIN users u ON b.action_by = u.id
     WHERE b.user_id = ?
     ORDER BY b.id DESC
   `;
@@ -78,6 +85,7 @@ app.get("/bookings/:userId", (req, res) => {
     res.json(rows);
   });
 });
+
 
 // Book a room
 app.post("/book", (req, res) => {
