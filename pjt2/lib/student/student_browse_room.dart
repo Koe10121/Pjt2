@@ -1,4 +1,3 @@
-// lib/student/student_browse_room.dart
 import 'package:flutter/material.dart';
 import '../api_service.dart';
 import '../main.dart';
@@ -8,7 +7,11 @@ import 'student_rules.dart';
 class BrowseRoomPage extends StatefulWidget {
   final int userId;
   final String username;
-  const BrowseRoomPage({super.key, required this.userId, required this.username});
+  const BrowseRoomPage({
+    super.key,
+    required this.userId,
+    required this.username,
+  });
 
   @override
   State<BrowseRoomPage> createState() => _BrowseRoomPageState();
@@ -18,14 +21,13 @@ class _BrowseRoomPageState extends State<BrowseRoomPage> {
   String todayDate = AppData.todayDate;
   String currentTime = AppData.nowTime();
   List<dynamic> rooms = [];
-  Map<String, dynamic> roomStatuses = {}; // keyed by room id -> timeslot map
+  Map<String, dynamic> roomStatuses = {};
   bool loading = true;
 
   @override
   void initState() {
     super.initState();
     _loadRooms();
-    // auto refresh
     Future.doWhile(() async {
       await Future.delayed(const Duration(seconds: 30));
       if (!mounted) return false;
@@ -43,23 +45,32 @@ class _BrowseRoomPageState extends State<BrowseRoomPage> {
     final statuses = await ApiService.getRoomStatuses(todayDate);
     setState(() {
       rooms = r;
-      roomStatuses = statuses; // note: map from backend
+      roomStatuses = statuses;
       loading = false;
     });
   }
 
   void logout(BuildContext context) {
-    showDialog(context: context, builder: (ctx) => AlertDialog(
-      title: const Text('Confirm Logout'),
-      content: const Text('Are you sure you want to logout?'),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-        ElevatedButton(onPressed: () {
-          Navigator.pop(ctx);
-          Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
-        }, child: const Text('Logout'))
-      ],
-    ));
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm Logout'),
+        content: const Text('Are you sure you want to logout?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+            },
+            child: const Text('Logout'),
+          ),
+        ],
+      ),
+    );
   }
 
   bool isTimePassed(String slotRange, String currentTime) {
@@ -71,84 +82,214 @@ class _BrowseRoomPageState extends State<BrowseRoomPage> {
     return currentTotal >= (endTotal - 30);
   }
 
-  Future<void> makeReservation(String roomName, String building, String timeSlot, int roomId) async {
+  Future<void> makeReservation(
+    String roomName,
+    String building,
+    String timeSlot,
+    int roomId,
+  ) async {
     final alreadyBooked = await AppData.hasActiveBookingToday(widget.userId);
     if (alreadyBooked) {
-      showDialog(context: context, builder: (ctx) => AlertDialog(
-        title: const Text('Booking Limit Reached'),
-        content: const Text('You already have a booking today (Pending or Approved).'),
-        actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK'))],
-      ));
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Booking Limit Reached'),
+          content: const Text(
+            'You already have a booking today (Pending or Approved).',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
       return;
     }
 
-    showDialog(context: context, builder: (ctx) => ConfirmBookingDialog(
-      roomName: roomName,
-      timeSlot: timeSlot,
-      onConfirm: () async {
-        Navigator.pop(ctx);
-        final res = await ApiService.bookRoom(widget.userId, roomId, timeSlot);
-        if (res['ok'] == true) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(res['msg'] ?? "Booking confirmed!")));
-          await _loadRooms(); // refresh UI so pending shows
-        } else {
-          showDialog(context: context, builder: (ctx2) => AlertDialog(
-            title: const Text('Cannot Book'),
-            content: Text(res['msg'] ?? "Slot unavailable."),
-            actions: [TextButton(onPressed: () => Navigator.pop(ctx2), child: const Text('OK'))],
-          ));
-        }
-      },
-    ));
+    showDialog(
+      context: context,
+      builder: (ctx) => ConfirmBookingDialog(
+        roomName: roomName,
+        timeSlot: timeSlot,
+        onConfirm: () async {
+          Navigator.pop(ctx);
+          final res = await ApiService.bookRoom(
+            widget.userId,
+            roomId,
+            timeSlot,
+          );
+          if (res['ok'] == true) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(res['msg'] ?? "Booking confirmed!")),
+            );
+            await _loadRooms();
+          } else {
+            showDialog(
+              context: context,
+              builder: (ctx2) => AlertDialog(
+                title: const Text('Cannot Book'),
+                content: Text(res['msg'] ?? "This time slot is unavailable."),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx2),
+                    child: const Text('OK'),
+                  ),
+                ],
+              ),
+            );
+          }
+        },
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.indigo[50],
       appBar: AppBar(
-        title: const Text("Student - Browse Room"),
-        titleTextStyle: const TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.bold),
-        backgroundColor: Colors.grey[300],
+        title: const Text(
+          "Browse Rooms",
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 20,
+          ),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.indigo[600],
         actions: [
-          IconButton(icon: const Icon(Icons.rule), onPressed: () => showDialog(context: context, builder: (c) => const ReservationRulesDialog())),
-          IconButton(icon: const Icon(Icons.logout), onPressed: () => logout(context)),
+          IconButton(
+            icon: const Icon(Icons.rule, color: Colors.white),
+            onPressed: () => showDialog(
+              context: context,
+              builder: (c) => const ReservationRulesDialog(),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white),
+            onPressed: () => logout(context),
+          ),
         ],
       ),
-      body: loading ? const Center(child: CircularProgressIndicator()) : SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(color: Colors.indigo[300], borderRadius: BorderRadius.circular(10)),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text("Welcome, ${widget.username}!", style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-              const SizedBox(height: 4),
-              const Text("MFU room reservation system", style: TextStyle(color: Colors.white)),
-            ]),
-          ),
-          const SizedBox(height: 16),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Row(children: [const Icon(Icons.calendar_today, size: 20), const SizedBox(width: 4), Text(todayDate)]),
-            Row(children: [const Icon(Icons.access_time, size: 20), const SizedBox(width: 4), Text(currentTime)]),
-          ]),
-          const SizedBox(height: 16),
-          for (var r in rooms)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: RoomCard(
-                roomName: r['name'],
-                building: r['building'],
-                isDisabled: (r['disabled'] == 1),
-                currentTime: currentTime,
-                isTimePassed: isTimePassed,
-                onBook: (room, building, slot) => makeReservation(room, building, slot, r['id']),
-                roomId: r['id'],
-                roomStatusesForThisRoom: roomStatuses[r['id'].toString()] ?? {},
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _loadRooms,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF5C6BC0), Color(0xFF3949AB)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "Welcome, ${widget.username}!",
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            "MFU Room Reservation System",
+                            style: TextStyle(color: Colors.white70),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(12),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black12,
+                            blurRadius: 5,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.calendar_today,
+                                color: Colors.indigo,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                todayDate,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.access_time,
+                                color: Colors.indigo,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 5),
+                              Text(
+                                currentTime,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    for (var r in rooms)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 18),
+                        child: RoomCard(
+                          roomName: r['name'],
+                          building: r['building'],
+                          isDisabled: (r['disabled'] == 1),
+                          currentTime: currentTime,
+                          isTimePassed: isTimePassed,
+                          onBook: (room, building, slot) =>
+                              makeReservation(room, building, slot, r['id']),
+                          roomId: r['id'],
+                          roomStatusesForThisRoom:
+                              roomStatuses[r['id'].toString()] ?? {},
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
-        ]),
-      ),
     );
   }
 }
@@ -161,7 +302,7 @@ class RoomCard extends StatelessWidget {
   final bool Function(String, String) isTimePassed;
   final void Function(String, String, String) onBook;
   final int roomId;
-  final Map roomStatusesForThisRoom; // e.g. {'13-15': 'Pending'}
+  final Map roomStatusesForThisRoom;
 
   const RoomCard({
     super.key,
@@ -188,60 +329,129 @@ class RoomCard extends StatelessWidget {
         color = Colors.grey;
       }
 
-      // if backend says reserved/pending for this room-date
       final backendStatus = roomStatusesForThisRoom[time];
       if (backendStatus != null) {
         status = backendStatus as String;
         if (status == 'Pending') color = Colors.amber;
-        if (status == 'Approved') color = Colors.red; // we call 'Reserved' but DB uses 'Approved'
+        if (status == 'Approved') color = Colors.red;
       }
 
       final isPast = isTimePassed(time, currentTime);
       if (status == "Free" && isPast) color = Colors.grey;
 
-      return TextButton(
-        style: TextButton.styleFrom(
-          backgroundColor: color.withOpacity(0.2),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      return Container(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        child: ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: color.withOpacity(0.15),
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(30),
+              side: BorderSide(color: color, width: 1),
+            ),
+          ),
+          onPressed: () {
+            if (status == "Free" && !isDisabled && !isPast) {
+              onBook(roomName, building, time);
+            } else if (status == "Free" && isPast) {
+              showDialog(
+                context: context,
+                builder: (ctx) => AlertDialog(
+                  title: const Text("Time Slot Expired"),
+                  content: const Text(
+                    "This time slot can no longer be reserved.",
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text("OK"),
+                    ),
+                  ],
+                ),
+              );
+            } else {
+              showDialog(
+                context: context,
+                builder: (context) => const RoomUnavailableDialog(),
+              );
+            }
+          },
+          icon: Icon(Icons.access_time, size: 18, color: color),
+          label: Text(
+            "$time  •  ${status == 'Approved' ? 'Reserved' : status}",
+            style: TextStyle(
+              color: color.withOpacity(
+                0.9,
+              ), // ✅ fixed: works for all color types
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ),
-        onPressed: () {
-          if (status == "Free" && !isDisabled && !isPast) {
-            onBook(roomName, building, time);
-          } else if (status == "Free" && isPast) {
-            showDialog(context: context, builder: (ctx) => AlertDialog(
-              title: const Text("Time Slot Expired"),
-              content: const Text("This time slot can no longer be reserved."),
-              actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text("OK"))],
-            ));
-          } else {
-            showDialog(context: context, builder: (context) => const RoomUnavailableDialog());
-          }
-        },
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.access_time, size: 16, color: color),
-          const SizedBox(width: 4),
-          Text(time, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
-          const SizedBox(width: 6),
-          Text(status == 'Approved' ? 'Reserved' : status, style: TextStyle(color: Colors.indigo[800], fontWeight: FontWeight.w500)),
-        ]),
       );
     }
 
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: Colors.grey[100], border: Border.all(color: Colors.grey.shade300)),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Row(children: [const Icon(Icons.meeting_room), const SizedBox(width: 6), Text(roomName, style: const TextStyle(fontWeight: FontWeight.bold))]),
-          Row(children: [const Icon(Icons.location_city, size: 18), const SizedBox(width: 4), Text(building)]),
-        ]),
-        const SizedBox(height: 12),
-        const Divider(thickness: 1),
-        const SizedBox(height: 12),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [buildSlot("8-10"), buildSlot("10-12")]),
-        const SizedBox(height: 8),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [buildSlot("13-15"), buildSlot("15-17")]),
-      ]),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.meeting_room, color: Colors.indigo),
+                  const SizedBox(width: 6),
+                  Text(
+                    roomName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.location_city,
+                    size: 18,
+                    color: Colors.indigo,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    building,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Divider(thickness: 1.2),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 8,
+            alignment: WrapAlignment.spaceBetween,
+            children: slots.map((slot) => buildSlot(slot)).toList(),
+          ),
+        ],
+      ),
     );
   }
 }
