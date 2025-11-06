@@ -8,7 +8,7 @@ const app = express();
 app.use(cors());
 app.use(bodyParser.json());
 
-// adjust host/user/password/database as needed
+// Database connection
 const db = mysql.createConnection({
   host: "localhost",
   user: "root",
@@ -21,47 +21,52 @@ db.connect(err => {
     console.log("❌ Database connection failed:", err);
     process.exit(1);
   } else {
-    console.log("✅ Connected to MySQL database: mfu_rooms_pj");
+    console.log("✅ Connected to MySQL database: mfu_rooms_pj1");
   }
 });
 
 app.get("/", (req, res) => res.send("MFU Room Reservation Backend is running!"));
 
-// LOGIN -> return { user: {...} } or null
+// ---------------- LOGIN ----------------
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
   const sql = "SELECT id, username, role FROM users WHERE username = ? AND password = ?";
   db.query(sql, [username, password], (err, result) => {
-    if (err) return res.status(500).json({ error: "db_error", details: err });
-    if (result.length > 0) return res.json({ user: result[0] });
-    return res.json({ user: null });
+    if (err) return res.status(500).json({ user: null, msg: "Database error during login." });
+    if (result.length > 0) return res.json({ user: result[0], msg: "Login successful." });
+    return res.json({ user: null, msg: "Incorrect username or password." });
   });
 });
 
-// REGISTER (student only) - role defaults to student but we'll explicitly set
+// ---------------- REGISTER ----------------
 app.post("/register", (req, res) => {
   const { username, password } = req.body;
   const sql = "INSERT INTO users (username, password, role) VALUES (?, ?, 'student')";
   db.query(sql, [username, password], (err) => {
     if (err) {
-      if (err.code === "ER_DUP_ENTRY") return res.json({ ok: false, msg: "Username already exists" });
-      return res.json({ ok: false, msg: "Database error" });
+      if (err.code === "ER_DUP_ENTRY") return res.json({ ok: false, msg: "Username already exists." });
+      return res.json({ ok: false, msg: "Database error." });
     }
-    return res.json({ ok: true });
+    return res.json({ ok: true, msg: "Registration successful." });
   });
 });
 
-// Get rooms (with disabled flag)
+// ---------------- ROOMS ----------------
 app.get("/rooms", (req, res) => {
   db.query("SELECT id, name, building, is_disabled FROM rooms ORDER BY name", (err, rows) => {
-    if (err) return res.status(500).json({ error: "db_error" });
-    // map is_disabled to integer 0/1
-    const out = rows.map(r => ({ id: r.id, name: r.name, building: r.building, disabled: r.is_disabled ? 1 : 0 }));
+    if (err) return res.status(500).json({ error: "db_error", msg: "Database error fetching rooms." });
+    const out = rows.map(r => ({
+      id: r.id,
+      name: r.name,
+      building: r.building,
+      disabled: r.is_disabled ? 1 : 0
+    }));
+    // ⚠️ Do NOT wrap, return plain array like before (so UI still works)
     res.json(out);
   });
 });
 
-// Get bookings for a user
+// ---------------- BOOKINGS ----------------
 app.get("/bookings/:userId", (req, res) => {
   const { userId } = req.params;
   const sql = `
@@ -81,105 +86,87 @@ app.get("/bookings/:userId", (req, res) => {
     ORDER BY b.id DESC
   `;
   db.query(sql, [userId], (err, rows) => {
-    if (err) return res.status(500).json({ error: "db_error" });
+    if (err) return res.status(500).json({ error: "db_error", msg: "Database error fetching bookings." });
+    // ⚠️ UI expects an array directly
     res.json(rows);
   });
 });
 
-
-// Book a room
+// ---------------- BOOK ----------------
 app.post("/book", (req, res) => {
   const { userId, roomId, timeslot } = req.body;
   const date = new Date().toISOString().slice(0, 10);
 
-  // 🕒 Parse the end time of the selected slot (e.g. "8-10" → 10:00)
-  const [startHourStr, endHourStr] = timeslot.split("-");
+  const [_, endHourStr] = timeslot.split("-");
   const endHour = parseInt(endHourStr);
-  // 🇹🇭 Convert to Thailand time (UTC+7)
+
   const now = new Date();
   const utc = now.getTime() + now.getTimezoneOffset() * 60000;
   const thailandTime = new Date(utc + 7 * 3600000);
 
-  // current server time (24h, in Thailand timezone)
   const currentHour = thailandTime.getHours();
   const currentMinute = thailandTime.getMinutes();
+  const currentTotal = currentHour * 60 + currentMinute;
+  const endTotal = endHour * 60;
 
-  const currentTotalMinutes = currentHour * 60 + currentMinute;
-  const endTotalMinutes = endHour * 60; // assume slot ends exactly at HH:00
+  if (currentTotal >= endTotal)
+    return res.json({ ok: false, msg: "This time slot has already passed." });
 
-  // 🧠 Check if the slot already passed
-  if (currentTotalMinutes >= endTotalMinutes) {
-    return res.json({
-      ok: false,
-      msg: "This time slot has already passed.",
-    });
-  }
-
-  // ✅ Check if user already has an active booking
   const checkSql = `
     SELECT * FROM bookings
     WHERE user_id = ? AND date = ?
     AND (status = 'Pending' OR status = 'Approved')
   `;
   db.query(checkSql, [userId, date], (err, existing) => {
-    if (err) return res.json({ ok: false, msg: "Database error" });
-    if (existing.length > 0) {
+    if (err) return res.json({ ok: false, msg: "Database error." });
+    if (existing.length > 0)
       return res.json({ ok: false, msg: "You already have an active booking today." });
-    }
 
-    // ✅ Check if the slot is already booked
     const slotSql = `
       SELECT * FROM bookings
       WHERE room_id = ? AND timeslot = ? AND date = ?
       AND (status = 'Pending' OR status = 'Approved')
     `;
     db.query(slotSql, [roomId, timeslot, date], (err, slot) => {
-      if (err) return res.json({ ok: false, msg: "Database error" });
-      if (slot.length > 0) {
+      if (err) return res.json({ ok: false, msg: "Database error." });
+      if (slot.length > 0)
         return res.json({ ok: false, msg: "This time slot is not available." });
-      }
 
-      // ✅ Otherwise, insert the booking
       const insertSql = `
         INSERT INTO bookings (user_id, room_id, timeslot, date, time, status)
         VALUES (?, ?, ?, ?, CURTIME(), 'Pending')
       `;
       db.query(insertSql, [userId, roomId, timeslot, date], (err) => {
-        if (err) return res.json({ ok: false, msg: "Insert failed" });
+        if (err) return res.json({ ok: false, msg: "Insert failed." });
         res.json({ ok: true, msg: "Booking request sent!" });
       });
     });
   });
 });
 
-
-
-// Get room statuses for a date: returns [{ room_id, timeslot, status }]
+// ---------------- ROOM STATUSES ----------------
 app.get("/room-statuses/:date", (req, res) => {
   const date = req.params.date;
-  // We'll return a list of statuses per room per timeslot
   const sql = `
     SELECT r.id AS room_id, r.name AS room_name, b.timeslot, b.status
     FROM rooms r
     LEFT JOIN bookings b ON r.id = b.room_id AND b.date = ?
-    WHERE 1
     ORDER BY r.id
   `;
   db.query(sql, [date], (err, rows) => {
-    if (err) return res.status(500).json({ error: "db_error" });
-    // convert into map: { room_id: { '8-10': 'Pending', ... } }
+    if (err) return res.status(500).json({ error: "db_error", msg: "Database error fetching statuses." });
     const map = {};
     rows.forEach(row => {
       const rid = row.room_id;
       if (!map[rid]) map[rid] = {};
       if (row.timeslot) map[rid][row.timeslot] = row.status;
     });
+    // ⚠️ UI expects plain map
     res.json(map);
   });
 });
 
-
 const PORT = 3000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT} (or use 10.0.2.2:${PORT} from Android emulator)`);
+  console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
