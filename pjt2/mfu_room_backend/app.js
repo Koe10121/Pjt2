@@ -93,56 +93,78 @@ app.get("/bookings/:userId", (req, res) => {
 });
 
 // ---------------- BOOK ----------------
+// ---------------- BOOK ----------------
 app.post("/book", (req, res) => {
   const { userId, roomId, timeslot } = req.body;
   const date = new Date().toISOString().slice(0, 10);
 
-  const [_, endHourStr] = timeslot.split("-");
-  const endHour = parseInt(endHourStr);
+  if (!userId || !roomId || !timeslot) {
+    return res.json({ ok: false, msg: "Missing userId, roomId, or timeslot." });
+  }
 
-  const now = new Date();
-  const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-  const thailandTime = new Date(utc + 7 * 3600000);
+  // ✅ Step 1: Check if the room is disabled
+  const roomCheckSql = "SELECT is_disabled FROM rooms WHERE id = ?";
+  db.query(roomCheckSql, [roomId], (err, rows) => {
+    if (err) return res.json({ ok: false, msg: "Database error while checking room." });
+    if (rows.length === 0) return res.json({ ok: false, msg: "Room not found." });
 
-  const currentHour = thailandTime.getHours();
-  const currentMinute = thailandTime.getMinutes();
-  const currentTotal = currentHour * 60 + currentMinute;
-  const endTotal = endHour * 60;
+    const isDisabled = rows[0].is_disabled === 1;
+    if (isDisabled) {
+      return res.json({ ok: false, msg: "This room is currently disabled." });
+    }
 
-  if (currentTotal >= endTotal)
-    return res.json({ ok: false, msg: "This time slot has already passed." });
+    // ✅ Step 2: Time validation
+    const [_, endHourStr] = timeslot.split("-");
+    const endHour = parseInt(endHourStr);
 
-  const checkSql = `
-    SELECT * FROM bookings
-    WHERE user_id = ? AND date = ?
-    AND (status = 'Pending' OR status = 'Approved')
-  `;
-  db.query(checkSql, [userId, date], (err, existing) => {
-    if (err) return res.json({ ok: false, msg: "Database error." });
-    if (existing.length > 0)
-      return res.json({ ok: false, msg: "You already have an active booking today." });
+    const now = new Date();
+    const utc = now.getTime() + now.getTimezoneOffset() * 60000;
+    const thailandTime = new Date(utc + 7 * 3600000);
 
-    const slotSql = `
+    const currentHour = thailandTime.getHours();
+    const currentMinute = thailandTime.getMinutes();
+    const currentTotal = currentHour * 60 + currentMinute;
+    const endTotal = endHour * 60;
+
+    if (currentTotal >= endTotal-30)
+      return res.json({ ok: false, msg: "This time slot has already passed." });
+
+    // ✅ Step 3: Check if user already has an active booking
+    const checkSql = `
       SELECT * FROM bookings
-      WHERE room_id = ? AND timeslot = ? AND date = ?
+      WHERE user_id = ? AND date = ?
       AND (status = 'Pending' OR status = 'Approved')
     `;
-    db.query(slotSql, [roomId, timeslot, date], (err, slot) => {
+    db.query(checkSql, [userId, date], (err, existing) => {
       if (err) return res.json({ ok: false, msg: "Database error." });
-      if (slot.length > 0)
-        return res.json({ ok: false, msg: "This time slot is not available." });
+      if (existing.length > 0)
+        return res.json({ ok: false, msg: "You already have an active booking today." });
 
-      const insertSql = `
-        INSERT INTO bookings (user_id, room_id, timeslot, date, time, status)
-        VALUES (?, ?, ?, ?, CURTIME(), 'Pending')
+      // ✅ Step 4: Check if slot already booked
+      const slotSql = `
+        SELECT * FROM bookings
+        WHERE room_id = ? AND timeslot = ? AND date = ?
+        AND (status = 'Pending' OR status = 'Approved')
       `;
-      db.query(insertSql, [userId, roomId, timeslot, date], (err) => {
-        if (err) return res.json({ ok: false, msg: "Insert failed." });
-        res.json({ ok: true, msg: "Booking request sent!" });
+      db.query(slotSql, [roomId, timeslot, date], (err, slot) => {
+        if (err) return res.json({ ok: false, msg: "Database error." });
+        if (slot.length > 0)
+          return res.json({ ok: false, msg: "This time slot is not available." });
+
+        // ✅ Step 5: Insert booking
+        const insertSql = `
+          INSERT INTO bookings (user_id, room_id, timeslot, date, time, status)
+          VALUES (?, ?, ?, ?, CURTIME(), 'Pending')
+        `;
+        db.query(insertSql, [userId, roomId, timeslot, date], (err) => {
+          if (err) return res.json({ ok: false, msg: "Insert failed." });
+          res.json({ ok: true, msg: "Booking request sent!" });
+        });
       });
     });
   });
 });
+
 
 // ---------------- ROOM STATUSES ----------------
 app.get("/room-statuses/:date", (req, res) => {
