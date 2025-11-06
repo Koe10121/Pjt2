@@ -1,4 +1,3 @@
-// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:pjt2/student/student_home.dart';
 import 'api_service.dart';
@@ -8,19 +7,22 @@ class AppData {
 
   static String get todayDate {
     final now = DateTime.now();
-    return "${now.year.toString().padLeft(4,'0')}-${now.month.toString().padLeft(2,'0')}-${now.day.toString().padLeft(2,'0')}";
+    return "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
   }
 
   static String nowTime() {
     final now = DateTime.now();
-    return "${now.hour.toString().padLeft(2,'0')}:${now.minute.toString().padLeft(2,'0')}";
+    return "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
   }
 
   static Future<bool> hasActiveBookingToday(int userId) async {
     final bookings = await ApiService.getBookings(userId);
-    return bookings.any((b) =>
-        (b['date'] ?? '') == todayDate &&
-        ((b['status'] ?? '') == 'Pending' || (b['status'] ?? '') == 'Approved'));
+    return bookings.any(
+      (b) =>
+          (b['date'] ?? '') == todayDate &&
+          ((b['status'] ?? '') == 'Pending' ||
+              (b['status'] ?? '') == 'Approved'),
+    );
   }
 }
 
@@ -30,6 +32,7 @@ void main() {
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -37,19 +40,20 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primarySwatch: Colors.indigo),
       home: const LoginPage(),
-      routes: {
-        '/register': (_) => const RegisterPage(),
-      },
+      routes: {'/register': (_) => const RegisterPage()},
     );
   }
 }
 
-// LOGIN PAGE (UI preserved)
+// ------------------------------------------------------
+// LOGIN PAGE (Enhanced UI)
+// ------------------------------------------------------
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
   @override
   State<LoginPage> createState() => _LoginPageState();
 }
+
 class _LoginPageState extends State<LoginPage> {
   final _usernameCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
@@ -78,7 +82,6 @@ class _LoginPageState extends State<LoginPage> {
       return;
     }
     AppData.currentUser = user;
-    // Navigate and pass username & id
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -93,36 +96,119 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.indigo[50],
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 400),
-              padding: const EdgeInsets.all(20.0),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.black26),
-                borderRadius: BorderRadius.circular(16.0),
-              ),
-              child: Column(children: [
-                const Text('MFU Room Reservation', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                TextField(controller: _usernameCtrl, decoration: const InputDecoration(hintText: 'Username', border: OutlineInputBorder())),
-                const SizedBox(height: 10),
-                TextField(controller: _passwordCtrl, obscureText: true, decoration: const InputDecoration(hintText: 'Password', border: OutlineInputBorder())),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  height: 45,
-                  child: ElevatedButton(
-                    onPressed: loading ? null : _tryLogin,
-                    child: loading ? const CircularProgressIndicator(color: Colors.white) : const Text('Sign In'),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            children: [
+              const SizedBox(height: 40),
+              // Header Gradient Box
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF5C6BC0), Color(0xFF3949AB)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-                const SizedBox(height: 12),
-                TextButton(onPressed: () => Navigator.pushNamed(context, '/register'), child: const Text("Create new account")),
-              ]),
-            ),
+                child: const Column(
+                  children: [
+                    Icon(Icons.meeting_room, color: Colors.white, size: 60),
+                    SizedBox(height: 10),
+                    Text(
+                      'MFU Room Reservation',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 5),
+                    Text(
+                      'Login to continue',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 30),
+
+              // Login Card
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _usernameCtrl,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.person_outline),
+                        labelText: 'Username',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                    TextField(
+                      controller: _passwordCtrl,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.lock_outline),
+                        labelText: 'Password',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 45,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.indigo,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        onPressed: loading ? null : _tryLogin,
+                        child: loading
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                              )
+                            : const Text(
+                                'Sign In',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white, // ✅ make text white
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    TextButton(
+                      onPressed: () =>
+                          Navigator.pushNamed(context, '/register'),
+                      child: const Text(
+                        "Create new account",
+                        style: TextStyle(color: Colors.indigo),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
@@ -130,12 +216,15 @@ class _LoginPageState extends State<LoginPage> {
   }
 }
 
-// REGISTER PAGE
+// ------------------------------------------------------
+// REGISTER PAGE (Enhanced UI)
+// ------------------------------------------------------
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
   @override
   State<RegisterPage> createState() => _RegisterPageState();
 }
+
 class _RegisterPageState extends State<RegisterPage> {
   final _usernameCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
@@ -166,28 +255,125 @@ class _RegisterPageState extends State<RegisterPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.indigo[50],
       body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 400),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(border: Border.all(color: Colors.black26), borderRadius: BorderRadius.circular(16)),
-              child: Column(children: [
-                const Text("Student Registration", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
-                const SizedBox(height: 16),
-                TextField(controller: _usernameCtrl, decoration: const InputDecoration(hintText: "Username", border: OutlineInputBorder())),
-                const SizedBox(height: 10),
-                TextField(controller: _passwordCtrl, obscureText: true, decoration: const InputDecoration(hintText: "Password", border: OutlineInputBorder())),
-                const SizedBox(height: 10),
-                TextField(controller: _confirmCtrl, obscureText: true, decoration: const InputDecoration(hintText: "Confirm Password", border: OutlineInputBorder())),
-                const SizedBox(height: 16),
-                SizedBox(width: double.infinity, height: 45, child: ElevatedButton(onPressed: loading ? null : _register, child: loading ? const CircularProgressIndicator(color: Colors.white) : const Text("Register"))),
-                const SizedBox(height: 10),
-                TextButton(onPressed: () => Navigator.pop(context), child: const Text("Back to Login"))
-              ]),
-            ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              const SizedBox(height: 40),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 40),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF3949AB), Color(0xFF5C6BC0)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Column(
+                  children: [
+                    Icon(Icons.person_add_alt_1, color: Colors.white, size: 60),
+                    SizedBox(height: 10),
+                    Text(
+                      'Student Registration',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    SizedBox(height: 5),
+                    Text(
+                      'Create your student account',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 30),
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.withOpacity(0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    TextField(
+                      controller: _usernameCtrl,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.person_outline),
+                        labelText: 'Username',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                    TextField(
+                      controller: _passwordCtrl,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.lock_outline),
+                        labelText: 'Password',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                    TextField(
+                      controller: _confirmCtrl,
+                      obscureText: true,
+                      decoration: const InputDecoration(
+                        prefixIcon: Icon(Icons.lock),
+                        labelText: 'Confirm Password',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      width: double.infinity,
+                      height: 45,
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.indigo,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        onPressed: loading ? null : _register,
+                        child: loading
+                            ? const CircularProgressIndicator(
+                                color: Colors.white,
+                              )
+                            : const Text(
+                                'Register',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.white, // ✅ white text color
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        "Back to Login",
+                        style: TextStyle(color: Colors.indigo),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),
