@@ -61,7 +61,6 @@ app.get("/rooms", (req, res) => {
       building: r.building,
       disabled: r.is_disabled ? 1 : 0
     }));
-    // ⚠️ Do NOT wrap, return plain array like before (so UI still works)
     res.json(out);
   });
 });
@@ -87,12 +86,10 @@ app.get("/bookings/:userId", (req, res) => {
   `;
   db.query(sql, [userId], (err, rows) => {
     if (err) return res.status(500).json({ error: "db_error", msg: "Database error fetching bookings." });
-    // ⚠️ UI expects an array directly
     res.json(rows);
   });
 });
 
-// ---------------- BOOK ----------------
 // ---------------- BOOK ----------------
 app.post("/book", (req, res) => {
   const { userId, roomId, timeslot } = req.body;
@@ -102,7 +99,6 @@ app.post("/book", (req, res) => {
     return res.json({ ok: false, msg: "Missing userId, roomId, or timeslot." });
   }
 
-  // ✅ Step 1: Check if the room is disabled
   const roomCheckSql = "SELECT is_disabled FROM rooms WHERE id = ?";
   db.query(roomCheckSql, [roomId], (err, rows) => {
     if (err) return res.json({ ok: false, msg: "Database error while checking room." });
@@ -113,7 +109,6 @@ app.post("/book", (req, res) => {
       return res.json({ ok: false, msg: "This room is currently disabled." });
     }
 
-    // ✅ Step 2: Time validation
     const [_, endHourStr] = timeslot.split("-");
     const endHour = parseInt(endHourStr);
 
@@ -129,7 +124,6 @@ app.post("/book", (req, res) => {
     if (currentTotal >= endTotal-30)
       return res.json({ ok: false, msg: "This time slot has already passed." });
 
-    // ✅ Step 3: Check if user already has an active booking
     const checkSql = `
       SELECT * FROM bookings
       WHERE user_id = ? AND date = ?
@@ -140,7 +134,6 @@ app.post("/book", (req, res) => {
       if (existing.length > 0)
         return res.json({ ok: false, msg: "You already have an active booking today." });
 
-      // ✅ Step 4: Check if slot already booked
       const slotSql = `
         SELECT * FROM bookings
         WHERE room_id = ? AND timeslot = ? AND date = ?
@@ -151,7 +144,6 @@ app.post("/book", (req, res) => {
         if (slot.length > 0)
           return res.json({ ok: false, msg: "This time slot is not available." });
 
-        // ✅ Step 5: Insert booking
         const insertSql = `
           INSERT INTO bookings (user_id, room_id, timeslot, date, time, status)
           VALUES (?, ?, ?, ?, CURTIME(), 'Pending')
@@ -183,7 +175,6 @@ app.get("/room-statuses/:date", (req, res) => {
       if (!map[rid]) map[rid] = {};
       if (row.timeslot) map[rid][row.timeslot] = row.status;
     });
-    // ⚠️ UI expects plain map
     res.json(map);
   });
 });

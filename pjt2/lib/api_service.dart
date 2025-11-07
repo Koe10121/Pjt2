@@ -3,11 +3,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  // ✅ CHANGE THIS depending on your setup:
-  // Android emulator -> 'http://10.0.2.2:3000'
-  // iOS simulator    -> 'http://localhost:3000'
-  // Real phone       -> 'http://<your-PC-IP>:3000'
-  static const base = 'http://192.168.1.105:3000';
+  
+  static const base = 'http://172.27.10.217:3000';
 
   // 🧍 LOGIN
   static Future<Map<String, dynamic>?> login(String username, String password) async {
