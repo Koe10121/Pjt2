@@ -1,8 +1,8 @@
-// app.js
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
 import mysql from "mysql2";
+import bcrypt from "bcrypt";
 
 const app = express();
 app.use(cors());
@@ -30,25 +30,45 @@ app.get("/", (req, res) => res.send("MFU Room Reservation Backend is running!"))
 // ---------------- LOGIN ----------------
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
-  const sql = "SELECT id, username, role FROM users WHERE username = ? AND password = ?";
-  db.query(sql, [username, password], (err, result) => {
+  const sql = "SELECT id, username, password, role FROM users WHERE username = ?";
+  
+  db.query(sql, [username], async (err, results) => {
     if (err) return res.status(500).json({ user: null, msg: "Database error during login." });
-    if (result.length > 0) return res.json({ user: result[0], msg: "Login successful." });
-    return res.json({ user: null, msg: "Incorrect username or password." });
+    if (results.length === 0) return res.json({ user: null, msg: "Incorrect username or password." });
+
+    const user = results[0];
+    const match = await bcrypt.compare(password, user.password);
+
+    if (!match) return res.json({ user: null, msg: "Incorrect username or password." });
+
+    // remove password before sending
+    delete user.password;
+    return res.json({ user, msg: "Login successful." });
   });
 });
 
 // ---------------- REGISTER ----------------
-app.post("/register", (req, res) => {
+app.post("/register", async (req, res) => {
   const { username, password } = req.body;
-  const sql = "INSERT INTO users (username, password, role) VALUES (?, ?, 'student')";
-  db.query(sql, [username, password], (err) => {
-    if (err) {
-      if (err.code === "ER_DUP_ENTRY") return res.json({ ok: false, msg: "Username already exists." });
-      return res.json({ ok: false, msg: "Database error." });
-    }
-    return res.json({ ok: true, msg: "Registration successful." });
-  });
+  if (!username || !password) {
+    return res.json({ ok: false, msg: "Username and password are required." });
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const sql = "INSERT INTO users (username, password, role) VALUES (?, ?, 'student')";
+    db.query(sql, [username, hashedPassword], (err) => {
+      if (err) {
+        if (err.code === "ER_DUP_ENTRY") {
+          return res.json({ ok: false, msg: "Username already exists." });
+        }
+        return res.json({ ok: false, msg: "Database error." });
+      }
+      return res.json({ ok: true, msg: "Registration successful (password secured)." });
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, msg: "Server error during registration." });
+  }
 });
 
 // ---------------- ROOMS ----------------
@@ -121,7 +141,7 @@ app.post("/book", (req, res) => {
     const currentTotal = currentHour * 60 + currentMinute;
     const endTotal = endHour * 60;
 
-    if (currentTotal >= endTotal-30)
+    if (currentTotal >= endTotal - 30)
       return res.json({ ok: false, msg: "This time slot has already passed." });
 
     const checkSql = `
@@ -156,7 +176,6 @@ app.post("/book", (req, res) => {
     });
   });
 });
-
 
 // ---------------- ROOM STATUSES ----------------
 app.get("/room-statuses/:date", (req, res) => {
