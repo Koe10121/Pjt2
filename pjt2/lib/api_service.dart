@@ -7,7 +7,7 @@ class ApiService {
   // Android emulator -> 'http://10.0.2.2:3000'
   // iOS simulator    -> 'http://localhost:3000'
   // Real phone       -> 'http://<your-PC-IP>:3000'
-  static const base = 'http://192.168.1.105:3000';
+  static const base = 'http://localhost:3000';
 
   // 🧍 LOGIN
   static Future<Map<String, dynamic>?> login(String username, String password) async {
@@ -94,4 +94,124 @@ class ApiService {
       return {};
     }
   }
+
+  
+  // =============== STAFF ROOM MANAGEMENT APIs ===============
+
+  // ➕ ADD NEW ROOM
+  static Future<Map<String, dynamic>> addRoom(String name, String building) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$base/staff/rooms'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'name': name,
+          'building': building,
+        }),
+      );
+      
+      if (res.statusCode == 201) {
+        final roomData = jsonDecode(res.body);
+        return {
+          'success': true, 
+          'room': {
+            'id': roomData['id'],
+            'name': roomData['name'],
+            'building': roomData['building'],
+            'is_disabled': roomData['is_disabled']
+          }
+        };
+      } else {
+        final error = jsonDecode(res.body);
+        return {'success': false, 'message': error['message'] ?? 'Failed to add room'};
+      }
+    } catch (e) {
+      print('addRoom error: $e');
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  // ✏️ EDIT ROOM
+  static Future<Map<String, dynamic>> editRoom(int roomId, String newName, String newBuilding) async {
+    try {
+      final res = await http.put(
+        Uri.parse('$base/staff/rooms/$roomId'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'name': newName,
+          'building': newBuilding,
+        }),
+      );
+      
+      if (res.statusCode == 200) {
+        final roomData = jsonDecode(res.body);
+        return {
+          'success': true, 
+          'room': {
+            'id': roomData['id'],
+            'name': roomData['name'],
+            'building': roomData['building']
+          }
+        };
+      } else {
+        final error = jsonDecode(res.body);
+        return {'success': false, 'message': error['message'] ?? 'Failed to update room'};
+      }
+    } catch (e) {
+      print('editRoom error: $e');
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  // 🔄 TOGGLE ROOM STATUS (Enable/Disable)
+  static Future<Map<String, dynamic>> toggleRoomStatus(int roomId, bool isDisabled) async {
+    try {
+      final res = await http.patch(
+        Uri.parse('$base/staff/rooms/$roomId/status'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'isDisabled': isDisabled,
+        }),
+      );
+      
+      if (res.statusCode == 200) {
+        final roomData = jsonDecode(res.body);
+        return {
+          'success': true, 
+          'room': {
+            'id': roomData['id'],
+            'is_disabled': roomData['is_disabled']
+          }
+        };
+      } else {
+        final error = jsonDecode(res.body);
+        return {'success': false, 'message': error['message'] ?? 'Failed to update room status'};
+      }
+    } catch (e) {
+      print('toggleRoomStatus error: $e');
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
+
+  // 🗑️ DELETE ROOM
+  static Future<Map<String, dynamic>> deleteRoom(int roomId) async {
+    try {
+      final res = await http.delete(
+        Uri.parse('$base/staff/rooms/$roomId'),
+        headers: {'Content-Type': 'application/json'},
+      );
+      
+      if (res.statusCode == 200) {
+        final result = jsonDecode(res.body);
+        return {'success': true, 'message': result['message'] ?? 'Room deleted successfully'};
+      } else {
+        final error = jsonDecode(res.body);
+        return {'success': false, 'message': error['message'] ?? 'Failed to delete room'};
+      }
+    } catch (e) {
+      print('deleteRoom error: $e');
+      return {'success': false, 'message': 'Network error: $e'};
+    }
+  }
 }
+

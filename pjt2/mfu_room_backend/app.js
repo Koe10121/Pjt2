@@ -45,7 +45,7 @@ app.post("/register", (req, res) => {
   db.query(sql, [username, password], (err) => {
     if (err) {
       if (err.code === "ER_DUP_ENTRY") return res.json({ ok: false, msg: "Username already exists." });
-      return res.json({ ok: false, msg: "Database error." });
+      return res.json({ ok: false, msg: "username already exist" });
     }
     return res.json({ ok: true, msg: "Registration successful." });
   });
@@ -187,6 +187,134 @@ app.get("/room-statuses/:date", (req, res) => {
     res.json(map);
   });
 });
+
+// =============== STAFF ROOM MANAGEMENT ENDPOINTS ===============
+
+// ➕ ADD NEW ROOM
+app.post("/staff/rooms", (req, res) => {
+  const { name, building } = req.body;
+
+  if (!name || !building) {
+    return res.status(400).json({ message: "Room name and building are required" });
+  }
+
+  const sql = "INSERT INTO rooms (name, building, is_disabled) VALUES (?, ?, 0)";
+  
+  db.query(sql, [name, building], (err, result) => {
+    if (err) {
+      if (err.code === "ER_DUP_ENTRY") {
+        return res.status(400).json({ message: "Room name already exists" });
+      }
+      console.log("Add room error:", err);
+      return res.status(500).json({ message: "Database error while adding room" });
+    }
+
+    res.status(201).json({
+      id: result.insertId,
+      name: name,
+      building: building,
+      is_disabled: 0
+    });
+  });
+});
+
+// ✏️ EDIT ROOM
+app.put("/staff/rooms/:id", (req, res) => {
+  const roomId = req.params.id;
+  const { name, building } = req.body;
+
+  if (!name || !building) {
+    return res.status(400).json({ message: "Room name and building are required" });
+  }
+
+  const checkSql = "SELECT id FROM rooms WHERE id = ?";
+  db.query(checkSql, [roomId], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ message: "Database error" });
+    }
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "Room not found" });
+    }
+
+    const updateSql = "UPDATE rooms SET name = ?, building = ? WHERE id = ?";
+    db.query(updateSql, [name, building, roomId], (err, result) => {
+      if (err) {
+        if (err.code === "ER_DUP_ENTRY") {
+          return res.status(400).json({ message: "Room name already exists" });
+        }
+        return res.status(500).json({ message: "Database error while updating room" });
+      }
+
+      res.json({
+        id: parseInt(roomId),
+        name: name,
+        building: building
+      });
+    });
+  });
+});
+
+// 🔄 TOGGLE ROOM STATUS (Enable/Disable)
+app.patch("/staff/rooms/:id/status", (req, res) => {
+  const roomId = req.params.id;
+  const { isDisabled } = req.body;
+
+  if (typeof isDisabled !== 'boolean') {
+    return res.status(400).json({ message: "isDisabled must be a boolean" });
+  }
+
+  const checkSql = "SELECT id FROM rooms WHERE id = ?";
+  db.query(checkSql, [roomId], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ message: "Database error" });
+    }
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "Room not found" });
+    }
+
+    const updateSql = "UPDATE rooms SET is_disabled = ? WHERE id = ?";
+    db.query(updateSql, [isDisabled ? 1 : 0, roomId], (err, result) => {
+      if (err) {
+        return res.status(500).json({ message: "Database error while updating room status" });
+      }
+
+      res.json({
+        id: parseInt(roomId),
+        is_disabled: isDisabled ? 1 : 0
+      });
+    });
+  });
+});
+
+// 🗑️ DELETE ROOM
+app.delete("/staff/rooms/:id", (req, res) => {
+  const roomId = req.params.id;
+
+  const checkSql = "SELECT id FROM rooms WHERE id = ?";
+  db.query(checkSql, [roomId], (err, rows) => {
+    if (err) {
+      return res.status(500).json({ message: "Database error" });
+    }
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "Room not found" });
+    }
+
+    const deleteSql = "DELETE FROM rooms WHERE id = ?";
+    db.query(deleteSql, [roomId], (err, result) => {
+      if (err) {
+        return res.status(500).json({ message: "Database error while deleting room" });
+      }
+
+      res.json({ 
+        message: "Room deleted successfully"
+      });
+    });
+  });
+});
+
 
 const PORT = 3000;
 app.listen(PORT, () => {
