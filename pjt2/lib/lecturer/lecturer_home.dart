@@ -1,5 +1,7 @@
+// lib/lecturer/lecturer_home.dart
 import 'package:flutter/material.dart';
 import '../main.dart';
+import '../api_service.dart';
 import 'lecturer_dashboard.dart';
 import 'lecturer_browse_room.dart';
 import 'lecturer_requests.dart';
@@ -14,43 +16,127 @@ class LecturerHomePage extends StatefulWidget {
 
 class _LecturerHomePageState extends State<LecturerHomePage> {
   int selectedIndex = 0;
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadAllData();
+  }
+
+  Future<void> _loadAllData() async {
+    setState(() => loading = true);
+
+    // 1️⃣ Load rooms
+    final rooms = await ApiService.getRooms();
+    AppData.slotStatus.clear();
+    AppData.roomBuildings.clear();
+    for (var room in rooms) {
+      AppData.slotStatus[room['name']] = {
+        '8-10': 'Free',
+        '10-12': 'Free',
+        '13-15': 'Free',
+        '15-17': 'Free',
+      };
+      AppData.roomBuildings[room['name']] = room['building'];
+    }
+
+    // 2️⃣ Load room statuses (mark Reserved/Pending)
+    final statuses = await ApiService.getRoomStatuses(AppData.todayDate);
+    statuses.forEach((roomId, map) {
+      for (var r in AppData.roomBuildings.keys) {
+        // link by room name match
+        final m = AppData.slotStatus[r];
+        if (m != null && map is Map) {
+          map.forEach((slot, status) {
+            m[slot] = status ?? 'Free';
+          });
+        }
+      }
+    });
+
+    // 3️⃣ Load lecturer requests + history
+    AppData.lecturerRequests =
+        List<Map<String, dynamic>>.from(await ApiService.getLecturerRequests());
+    final id = AppData.currentUser?['id'] ?? 0;
+    AppData.lecturerHistory =
+        List<Map<String, dynamic>>.from(await ApiService.getLecturerHistory(id));
+
+    setState(() => loading = false);
+  }
 
   @override
   Widget build(BuildContext context) {
     final pages = [
-      LecturerDashboardPage(onRefresh: () => setState(() {})),
+      LecturerDashboardPage(onRefresh: _loadAllData),
       const LecturerBrowseRoomPage(),
-      LecturerRequestsPage(onRefresh: () => setState(() {})),
-      LecturerHistoryPage(onRefresh: () => setState(() {})),
+      LecturerRequestsPage(onRefresh: _loadAllData),
+      LecturerHistoryPage(onRefresh: _loadAllData),
+    ];
+
+    final titles = [
+      "Dashboard",
+      "Browse Rooms",
+      "Requests",
+      "History",
     ];
 
     return Scaffold(
-      body: pages[selectedIndex],
+      appBar: AppBar(
+        title: Text(
+          "Lecturer - ${titles[selectedIndex]}",
+          style: const TextStyle(
+              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20),
+        ),
+        centerTitle: true,
+        backgroundColor: Colors.indigo,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.white),
+            onPressed: _loadAllData,
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout, color: Colors.white),
+            onPressed: () => _logout(context),
+          ),
+        ],
+      ),
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : pages[selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: selectedIndex,
         onTap: (i) => setState(() => selectedIndex = i),
         type: BottomNavigationBarType.fixed,
-        backgroundColor: Colors.white,
-        selectedItemColor: Colors.black,
+        selectedItemColor: Colors.indigo,
         unselectedItemColor: Colors.grey,
+        backgroundColor: Colors.white,
         items: [
-          const BottomNavigationBarItem(icon: Icon(Icons.grid_view), label: "Dashboard"),
-          const BottomNavigationBarItem(icon: Icon(Icons.meeting_room), label: "Rooms"),
+          const BottomNavigationBarItem(
+              icon: Icon(Icons.grid_view_rounded), label: "Dashboard"),
+          const BottomNavigationBarItem(
+              icon: Icon(Icons.meeting_room_outlined), label: "Rooms"),
           BottomNavigationBarItem(
             icon: Stack(
               clipBehavior: Clip.none,
               children: [
-                const Icon(Icons.report),
+                const Icon(Icons.assignment_rounded),
                 if (AppData.lecturerRequests.isNotEmpty)
                   Positioned(
                     right: -6,
                     bottom: -3,
                     child: Container(
                       padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(color: Colors.red, shape: BoxShape.circle),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
                       child: Text(
                         AppData.lecturerRequests.length.toString(),
-                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -58,29 +144,43 @@ class _LecturerHomePageState extends State<LecturerHomePage> {
             ),
             label: "Requests",
           ),
-          const BottomNavigationBarItem(icon: Icon(Icons.history), label: "History"),
+          const BottomNavigationBarItem(
+              icon: Icon(Icons.history_rounded), label: "History"),
         ],
       ),
     );
   }
-}
 
-void logout(BuildContext context) {
-  showDialog(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('Confirm Logout'),
-      content: const Text('Are you sure you want to logout?'),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-        ElevatedButton(
-          onPressed: () {
-            Navigator.pop(ctx);
-            Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
-          },
-          child: const Text('Logout'),
-        ),
-      ],
-    ),
-  );
+  void _logout(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm Logout',
+            style: TextStyle(fontWeight: FontWeight.bold)),
+        content: const Text('Are you sure you want to logout?'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel',
+                  style:
+                      TextStyle(color: Colors.grey, fontWeight: FontWeight.bold))),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+            },
+            child: const Text('Logout',
+                style:
+                    TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
 }

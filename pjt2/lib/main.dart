@@ -1,10 +1,14 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:pjt2/student/student_home.dart';
+import 'package:pjt2/lecturer/lecturer_home.dart'; // ✅ add this (make sure path matches)
 import 'api_service.dart';
 
 class AppData {
+  // 👤 logged-in user (student or lecturer)
   static Map<String, dynamic>? currentUser;
 
+  // 🕓 common utils
   static String get todayDate {
     final now = DateTime.now();
     return "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
@@ -15,6 +19,7 @@ class AppData {
     return "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
   }
 
+  // 🧾 (student) check if has booking today
   static Future<bool> hasActiveBookingToday(int userId) async {
     final bookings = await ApiService.getBookings(userId);
     return bookings.any(
@@ -23,6 +28,45 @@ class AppData {
           ((b['status'] ?? '') == 'Pending' ||
               (b['status'] ?? '') == 'Approved'),
     );
+  }
+
+  // --------------------------------------------------
+  // LECTURER SHARED STATE (for your lecturer pages)
+  // --------------------------------------------------
+
+  // rooms status cache for lecturer browse page
+  // e.g. { "A101": { "8-10": "Free", "10-12": "Pending" } }
+  static Map<String, Map<String, String>> slotStatus = {};
+  // room -> building
+  static Map<String, String> roomBuildings = {};
+
+  // pending requests that lecturer can approve/reject
+  static List<Map<String, dynamic>> lecturerRequests = [];
+
+  // history of actions (approve/reject)
+  static List<Map<String, dynamic>> lecturerHistory = [];
+
+  // this is the function your lecturer requests page was calling
+  static Future<void> lecturerAction(int idx, String status, String role) async {
+    if (idx < 0 || idx >= lecturerRequests.length) return;
+
+    final req = lecturerRequests[idx];
+    final bookingId = req['id'];
+    final lecturerId = currentUser?['id'] ?? 0;
+
+    // this will call API -> /lecturer/approve or /lecturer/reject (we added in backend)
+    final result = await ApiService.lecturerAction(lecturerId, bookingId, status);
+
+    if (result['ok'] == true) {
+      // move to history
+      final record = {
+        ...req,
+        'status': status,
+        'actionTime': DateTime.now().toString().substring(11, 16),
+      };
+      lecturerHistory.insert(0, record);
+      lecturerRequests.removeAt(idx);
+    }
   }
 }
 
@@ -40,13 +84,15 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primarySwatch: Colors.indigo),
       home: const LoginPage(),
-      routes: {'/register': (_) => const RegisterPage()},
+      routes: {
+        '/register': (_) => const RegisterPage(),
+      },
     );
   }
 }
 
 // ------------------------------------------------------
-// LOGIN PAGE (Enhanced UI)
+// LOGIN PAGE (same UI as yours)
 // ------------------------------------------------------
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -73,24 +119,36 @@ class _LoginPageState extends State<LoginPage> {
     setState(() => loading = true);
     final user = await ApiService.login(username, password);
     setState(() => loading = false);
+
     if (user == null) {
       _showMsg("Invalid username or password");
       return;
     }
-    if (user['role'] != 'student') {
-      _showMsg("Only student login is active for now");
-      return;
-    }
+
+    // ✅ save globally
     AppData.currentUser = user;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(
-        builder: (_) => StudentHomePage(
-          userId: user['id'] as int,
-          username: user['username'] as String,
+
+    // ✅ route by role
+    if (user['role'] == 'student') {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => StudentHomePage(
+            userId: user['id'] as int,
+            username: user['username'] as String,
+          ),
         ),
-      ),
-    );
+      );
+    } else if (user['role'] == 'lecturer') {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const LecturerHomePage(),
+        ),
+      );
+    } else {
+      _showMsg("This role is not allowed to login yet.");
+    }
   }
 
   @override
@@ -103,7 +161,7 @@ class _LoginPageState extends State<LoginPage> {
           child: Column(
             children: [
               const SizedBox(height: 40),
-              // Header Gradient Box
+              // Header
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 40),
@@ -136,8 +194,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               const SizedBox(height: 30),
-
-              // Login Card
+              // Card
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
@@ -184,22 +241,19 @@ class _LoginPageState extends State<LoginPage> {
                         ),
                         onPressed: loading ? null : _tryLogin,
                         child: loading
-                            ? const CircularProgressIndicator(
-                                color: Colors.white,
-                              )
+                            ? const CircularProgressIndicator(color: Colors.white)
                             : const Text(
                                 'Sign In',
                                 style: TextStyle(
                                   fontSize: 16,
-                                  color: Colors.white, // ✅ make text white
+                                  color: Colors.white,
                                 ),
                               ),
                       ),
                     ),
                     const SizedBox(height: 12),
                     TextButton(
-                      onPressed: () =>
-                          Navigator.pushNamed(context, '/register'),
+                      onPressed: () => Navigator.pushNamed(context, '/register'),
                       child: const Text(
                         "Create new account",
                         style: TextStyle(color: Colors.indigo),
@@ -217,7 +271,7 @@ class _LoginPageState extends State<LoginPage> {
 }
 
 // ------------------------------------------------------
-// REGISTER PAGE (Enhanced UI)
+// REGISTER PAGE (same as yours)
 // ------------------------------------------------------
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -350,14 +404,12 @@ class _RegisterPageState extends State<RegisterPage> {
                         ),
                         onPressed: loading ? null : _register,
                         child: loading
-                            ? const CircularProgressIndicator(
-                                color: Colors.white,
-                              )
+                            ? const CircularProgressIndicator(color: Colors.white)
                             : const Text(
                                 'Register',
                                 style: TextStyle(
                                   fontSize: 16,
-                                  color: Colors.white, // ✅ white text color
+                                  color: Colors.white,
                                 ),
                               ),
                       ),

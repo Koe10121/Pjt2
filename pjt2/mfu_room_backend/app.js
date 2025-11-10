@@ -198,6 +198,92 @@ app.get("/room-statuses/:date", (req, res) => {
   });
 });
 
+// ---------------- LECTURER: GET PENDING REQUESTS ----------------
+app.get("/lecturer/requests", (req, res) => {
+  const sql = `
+    SELECT 
+      b.id, 
+      b.timeslot, 
+      DATE_FORMAT(b.date, '%Y-%m-%d') AS date,
+      DATE_FORMAT(b.time, '%H:%i') AS time,
+      b.status,
+      r.name AS room, 
+      r.building,
+      u.username AS requestedBy
+    FROM bookings b
+    JOIN rooms r ON b.room_id = r.id
+    JOIN users u ON b.user_id = u.id
+    WHERE b.status = 'Pending'
+    ORDER BY b.id DESC
+  `;
+  db.query(sql, (err, rows) => {
+    if (err) {
+      console.error("Error fetching lecturer requests:", err);
+      return res.status(500).json({ ok: false, msg: "Database error fetching pending requests." });
+    }
+    res.json(rows);
+  });
+});
+
+// ---------------- LECTURER: APPROVE or REJECT REQUEST ----------------
+app.post("/lecturer/action", (req, res) => {
+  const { lecturerId, bookingId, status } = req.body;
+  
+  if (!lecturerId || !bookingId || !status)
+    return res.json({ ok: false, msg: "Missing lecturerId, bookingId, or status." });
+
+  if (!["Approved", "Rejected"].includes(status))
+    return res.json({ ok: false, msg: "Invalid status value." });
+
+  const sql = `
+    UPDATE bookings
+    SET status = ?, action_by = ?, time = CURTIME()
+    WHERE id = ?
+  `;
+
+  db.query(sql, [status, lecturerId, bookingId], (err, result) => {
+    if (err) {
+      console.error("Error updating booking:", err);
+      return res.json({ ok: false, msg: "Database error while updating booking." });
+    }
+    if (result.affectedRows === 0)
+      return res.json({ ok: false, msg: "Booking not found or already processed." });
+
+    res.json({ ok: true, msg: `Booking ${status.toLowerCase()} successfully.` });
+  });
+});
+
+// ---------------- LECTURER: HISTORY ----------------
+app.get("/lecturer/history/:lecturerId", (req, res) => {
+  const { lecturerId } = req.params;
+
+  const sql = `
+    SELECT 
+      b.id,
+      b.timeslot,
+      DATE_FORMAT(b.date, '%Y-%m-%d') AS date,
+      DATE_FORMAT(b.time, '%H:%i') AS time,
+      b.status,
+      r.name AS room,
+      r.building,
+      u.username AS requestedBy
+    FROM bookings b
+    JOIN rooms r ON b.room_id = r.id
+    JOIN users u ON b.user_id = u.id
+    WHERE b.action_by = ? AND (b.status = 'Approved' OR b.status = 'Rejected')
+    ORDER BY b.id DESC
+  `;
+
+  db.query(sql, [lecturerId], (err, rows) => {
+    if (err) {
+      console.error("Error fetching lecturer history:", err);
+      return res.status(500).json({ ok: false, msg: "Database error fetching lecturer history." });
+    }
+    res.json(rows);
+  });
+});
+
+
 const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);

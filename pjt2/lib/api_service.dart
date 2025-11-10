@@ -4,7 +4,50 @@ import 'package:http/http.dart' as http;
 
 class ApiService {
   
-  static const base = 'http://172.27.10.217:3000';
+  static const base = 'http://192.168.1.105:3000';
+
+ // 🧑‍🏫 Lecturer: get all pending requests
+  static Future<List<dynamic>> getLecturerRequests() async {
+    try {
+      final res = await http.get(Uri.parse('$base/lecturer/requests'));
+      if (res.statusCode != 200) return [];
+      return jsonDecode(res.body) as List<dynamic>;
+    } catch (e) {
+      print('getLecturerRequests error: $e');
+      return [];
+    }
+  }
+
+  // 🧑‍🏫 Lecturer: approve or reject booking
+  static Future<Map<String, dynamic>> lecturerAction(int lecturerId, int bookingId, String status) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$base/lecturer/action'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'lecturerId': lecturerId,
+          'bookingId': bookingId,
+          'status': status,
+        }),
+      );
+      return jsonDecode(res.body);
+    } catch (e) {
+      print('lecturerAction error: $e');
+      return {'ok': false, 'msg': 'Network error'};
+    }
+  }
+
+  // 🧑‍🏫 Lecturer: get history
+  static Future<List<dynamic>> getLecturerHistory(int lecturerId) async {
+    try {
+      final res = await http.get(Uri.parse('$base/lecturer/history/$lecturerId'));
+      if (res.statusCode != 200) return [];
+      return jsonDecode(res.body) as List<dynamic>;
+    } catch (e) {
+      print('getLecturerHistory error: $e');
+      return [];
+    }
+  }
 
   // 🧍 LOGIN
   static Future<Map<String, dynamic>?> login(String username, String password) async {
@@ -92,3 +135,6 @@ class ApiService {
     }
   }
 }
+
+
+
