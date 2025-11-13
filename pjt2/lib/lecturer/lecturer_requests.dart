@@ -12,27 +12,54 @@ class LecturerRequestsPage extends StatefulWidget {
 
 class _LecturerRequestsPageState extends State<LecturerRequestsPage> {
   void confirmAction(int idx, String action) {
+    final isApprove = action == 'Approve';
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('$action Request'),
-        content: Text('Are you sure you want to $action this booking?'),
+        title: Text(
+          '$action Request',
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        content: Text(
+          'Are you sure you want to ${action.toLowerCase()} this booking?',
+          style: const TextStyle(fontSize: 16),
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: const Text('Cancel',
+                style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
           ),
           ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: isApprove ? Colors.green : Colors.red,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
             onPressed: () {
               Navigator.pop(ctx);
-              AppData.lecturerAction(idx, action == 'Approve' ? 'Approved' : 'Rejected', 'Lecturer');
+              AppData.lecturerAction(
+                  idx, isApprove ? 'Approved' : 'Rejected', 'Lecturer');
               setState(() {});
               widget.onRefresh();
+
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Request ${action}d successfully')),
+                SnackBar(
+                  content: Text(
+                      'Request ${action.toLowerCase()}ed successfully!',
+                      style: const TextStyle(color: Colors.white)),
+                  backgroundColor: isApprove ? Colors.green : Colors.red,
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10)),
+                ),
               );
             },
-            child: const Text('Confirm'),
+            child: const Text('Confirm',
+                style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -42,32 +69,31 @@ class _LecturerRequestsPageState extends State<LecturerRequestsPage> {
   @override
   Widget build(BuildContext context) {
     final reqs = AppData.lecturerRequests;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Lecturer - Requests"),
-        backgroundColor: Colors.grey[300],
-        actions: [
-          IconButton(icon: const Icon(Icons.logout), onPressed: () => logout(context)),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(children: [
-          if (reqs.isEmpty)
-            const Text('No pending requests', style: TextStyle(color: Colors.black54)),
-          for (int i = 0; i < reqs.length; i++)
-            _RequestCard(
-              roomName: reqs[i]['room']!,
-              building: reqs[i]['building']!,
-              timeslot: reqs[i]['timeslot']!,
-              date: reqs[i]['date']!,
-              time: reqs[i]['time']!,
-              requestedBy: reqs[i]['requestedBy']!,
-              onApprove: () => confirmAction(i, 'Approve'),
-              onReject: () => confirmAction(i, 'Reject'),
+
+      body: reqs.isEmpty
+          ? const Center(
+              child: Text("No pending requests",
+                  style: TextStyle(color: Colors.black54, fontSize: 16)))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  for (int i = 0; i < reqs.length; i++)
+                    _RequestCard(
+                      roomName: reqs[i]['room']!,
+                      building: reqs[i]['building']!,
+                      timeslot: reqs[i]['timeslot']!,
+                      date: reqs[i]['date']!,
+                      time: reqs[i]['time']!,
+                      requestedBy: reqs[i]['requestedBy']!,
+                      onApprove: () => confirmAction(i, 'Approve'),
+                      onReject: () => confirmAction(i, 'Reject'),
+                    ),
+                ],
+              ),
             ),
-        ]),
-      ),
     );
   }
 }
@@ -91,51 +117,96 @@ class _RequestCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey[100],
-        border: Border.all(color: Colors.grey.shade400),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black12, blurRadius: 6, offset: const Offset(0, 3))
+        ],
       ),
       padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 16),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // 🏢 Header (room + building)
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Row(children: [
-              const Icon(Icons.meeting_room),
+              const Icon(Icons.meeting_room, color: Colors.indigo),
               const SizedBox(width: 6),
-              Text(roomName, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text(roomName,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 16)),
             ]),
             Row(children: [
-              const Icon(Icons.apartment, size: 20),
+              const Icon(Icons.apartment, size: 20, color: Colors.grey),
               const SizedBox(width: 6),
-              Text(building),
+              Text(building, style: const TextStyle(color: Colors.black54)),
             ]),
           ],
         ),
-        const Divider(),
-        Row(children: [const Icon(Icons.access_time, size: 18), const SizedBox(width: 6), Text('Time Slot : $timeslot')]),
+        const SizedBox(height: 10),
+        const Divider(thickness: 1),
+        const SizedBox(height: 10),
+
+        // ⏰ Time and Date Info
+        _infoRow(Icons.access_time, "Time Slot : $timeslot"),
         const SizedBox(height: 6),
-        Row(children: [const Icon(Icons.calendar_today, size: 18), const SizedBox(width: 6), Text('Booking Date : $date')]),
+        _infoRow(Icons.calendar_today, "Booking Date : $date"),
         const SizedBox(height: 6),
-        Row(children: [const Icon(Icons.schedule, size: 18), const SizedBox(width: 6), Text('Booking Time : $time')]),
-        const SizedBox(height: 6),
-        Text("Requested by : $requestedBy", style: const TextStyle(fontWeight: FontWeight.w500)),
-        const SizedBox(height: 12),
-        Row(children: [
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            onPressed: onReject,
-            child: const Text('Reject', style: TextStyle(color: Colors.white)),
-          ),
-          const SizedBox(width: 12),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            onPressed: onApprove,
-            child: const Text('Approve', style: TextStyle(color: Colors.white)),
-          ),
-        ]),
+        _infoRow(Icons.schedule, "Booking Time : $time"),
+        const SizedBox(height: 10),
+        Text("Requested by : $requestedBy",
+            style: const TextStyle(
+                fontWeight: FontWeight.w500, color: Colors.black87)),
+        const SizedBox(height: 16),
+
+        // ✅ Buttons
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            ElevatedButton.icon(
+              icon: const Icon(Icons.close, color: Colors.white, size: 18),
+              label: const Text("Reject"),
+              onPressed: onReject,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(width: 12),
+            ElevatedButton.icon(
+              icon: const Icon(Icons.check, color: Colors.white, size: 18),
+              label: const Text("Approve"),
+              onPressed: onApprove,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+          ],
+        ),
       ]),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: Colors.indigo),
+        const SizedBox(width: 6),
+        Text(text,
+            style: const TextStyle(
+                fontSize: 15,
+                color: Colors.black87,
+                fontWeight: FontWeight.w500)),
+      ],
     );
   }
 }

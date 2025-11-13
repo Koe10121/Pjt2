@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../main.dart';
-import 'lecturer_home.dart'; // for logout()
+import 'lecturer_home.dart';
 
 class LecturerDashboardPage extends StatelessWidget {
   final VoidCallback onRefresh;
@@ -30,7 +30,7 @@ class LecturerDashboardPage extends StatelessWidget {
     int c = 0;
     AppData.slotStatus.forEach((_, map) {
       map.forEach((_, status) {
-        if (status == 'Reserved') c++;
+        if (status == 'Reserved' || status == 'Approved') c++;
       });
     });
     return c;
@@ -54,84 +54,110 @@ class LecturerDashboardPage extends StatelessWidget {
     final disabled = countDisabled();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Lecturer - Dashboard"),
-        backgroundColor: Colors.grey[300],
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => logout(context), // ✅ works now
-          ),
-        ],
-      ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Header Card
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
                 color: Colors.indigo[300],
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.indigo.withOpacity(0.2),
+                    offset: const Offset(0, 4),
+                    blurRadius: 8,
+                  ),
+                ],
               ),
               child: const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    "Welcome, Lecturer!",
+                    "Welcome, Lecturer 👋",
                     style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white),
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
                   SizedBox(height: 4),
-                  Text("You can manage room booking requests here",
-                      style: TextStyle(color: Colors.white)),
+                  Text(
+                    "Manage student booking requests efficiently",
+                    style: TextStyle(color: Colors.white70),
+                  ),
                 ],
               ),
             ),
+
+            const SizedBox(height: 24),
+            const Text(
+              "Today's Overview",
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 16),
-            const Divider(thickness: 1),
-            const SizedBox(height: 12),
-            const Text("Today's Overview",
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 16),
+
+            // Overview Cards
             Row(
               children: [
                 Expanded(
-                    child: _OverviewCard(
-                        icon: Icons.meeting_room,
-                        title: "Free Slots",
-                        value: "$free",
-                        color: Colors.green)),
+                  child: _OverviewCard(
+                    icon: Icons.meeting_room,
+                    title: "Free Slots",
+                    value: "$free",
+                    color: Colors.green,
+                  ),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
-                    child: _OverviewCard(
-                        icon: Icons.hourglass_empty,
-                        title: "Pending Slots",
-                        value: "$pending",
-                        color: Colors.amber)),
+                  child: _OverviewCard(
+                    icon: Icons.hourglass_empty,
+                    title: "Pending Slots",
+                    value: "$pending",
+                    color: Colors.amber,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 12),
             Row(
               children: [
                 Expanded(
-                    child: _OverviewCard(
-                        icon: Icons.lock,
-                        title: "Reserved Slots",
-                        value: "$reserved",
-                        color: Colors.red)),
+                  child: _OverviewCard(
+                    icon: Icons.lock,
+                    title: "Reserved Slots",
+                    value: "$reserved",
+                    color: Colors.red,
+                  ),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
-                    child: _OverviewCard(
-                        icon: Icons.block,
-                        title: "Disabled Rooms",
-                        value: "$disabled",
-                        color: Colors.grey)),
+                  child: _OverviewCard(
+                    icon: Icons.block,
+                    title: "Disabled Rooms",
+                    value: "$disabled",
+                    color: Colors.grey,
+                  ),
+                ),
               ],
+            ),
+            const SizedBox(height: 24),
+            Center(
+              child: TextButton.icon(
+                onPressed: onRefresh,
+                icon: const Icon(Icons.refresh, color: Colors.indigo),
+                label: const Text(
+                  "Refresh Overview",
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.indigo,
+                  ),
+                ),
+              ),
             ),
           ],
         ),
@@ -146,30 +172,49 @@ class _OverviewCard extends StatelessWidget {
   final String value;
   final Color color;
 
-  const _OverviewCard(
-      {required this.icon,
-      required this.title,
-      required this.value,
-      required this.color});
+  const _OverviewCard({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
-        border: Border.all(color: Colors.grey.shade400),
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black12,
+            blurRadius: 6,
+            offset: const Offset(0, 3),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          Icon(icon, size: 36, color: color),
-          const SizedBox(height: 8),
-          Text(value,
-              style: TextStyle(
-                  color: color, fontSize: 20, fontWeight: FontWeight.bold)),
+          Icon(icon, size: 38, color: color),
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           const SizedBox(height: 4),
-          Text(title),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: Colors.black87,
+            ),
+          ),
         ],
       ),
     );

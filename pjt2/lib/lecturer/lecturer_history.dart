@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import '../main.dart';
 import 'lecturer_home.dart';
@@ -15,37 +14,33 @@ class _LecturerHistoryPageState extends State<LecturerHistoryPage> {
   @override
   Widget build(BuildContext context) {
     final list = AppData.lecturerHistory;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Lecturer - History"),
-        backgroundColor: Colors.grey[300],
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => logout(context),
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            if (list.isEmpty)
-              const Text('No history yet', style: TextStyle(color: Colors.black54)),
-            for (var h in list)
-              _LecturerHistoryCard(
-                roomName: h['room'] ?? '',
-                building: h['building'] ?? '',
-                status: h['status'] ?? '',
-                color: h['status'] == 'Approved' ? Colors.green : Colors.red,
-                requestedBy: h['requestedBy'] ?? '',
-                actionTime: h['actionTime'] ?? '',
-                date: h['date'] ?? '',
-                timeslot: h['timeslot'] ?? '-',
+
+      body: list.isEmpty
+          ? const Center(
+              child: Text("No history yet",
+                  style: TextStyle(color: Colors.black54, fontSize: 16)))
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  for (var h in list)
+                    _LecturerHistoryCard(
+                      roomName: h['room'] ?? '',
+                      building: h['building'] ?? '',
+                      status: h['status'] ?? '',
+                      color: h['status'] == 'Approved'
+                          ? Colors.green
+                          : Colors.red,
+                      requestedBy: h['requestedBy'] ?? '',
+                      actionTime: h['actionTime'] ?? '',
+                      date: h['date'] ?? '',
+                      timeslot: h['timeslot'] ?? '-',
+                    ),
+                ],
               ),
-          ],
-        ),
-      ),
+            ),
     );
   }
 }
@@ -69,80 +64,104 @@ class _LecturerHistoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade400),
-        borderRadius: BorderRadius.circular(12),
-        color: Colors.grey[100],
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black12, blurRadius: 6, offset: const Offset(0, 3))
+        ],
       ),
       padding: const EdgeInsets.all(16),
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 🏠 Room & Building
+          // 🏢 Room and Building
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Row(children: [
-                const Icon(Icons.meeting_room),
+                const Icon(Icons.meeting_room, color: Colors.indigo),
                 const SizedBox(width: 6),
                 Text(roomName,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 16)),
               ]),
               Row(children: [
-                const Icon(Icons.apartment, size: 20),
+                const Icon(Icons.apartment, size: 20, color: Colors.grey),
                 const SizedBox(width: 6),
-                Text(building),
+                Text(building,
+                    style: const TextStyle(
+                        color: Colors.black54, fontWeight: FontWeight.w500)),
               ]),
             ],
           ),
-          const Divider(),
-
-          // ⏰ Time Slot
-          Row(children: [
-            const Icon(Icons.timelapse, size: 18),
-            const SizedBox(width: 6),
-            Text('Time Slot : $timeslot'),
-          ]),
-          const SizedBox(height: 6),
-
-          // 📅 Date
-          Row(children: [
-            const Icon(Icons.calendar_today, size: 18),
-            const SizedBox(width: 6),
-            Text('Date : $date'),
-          ]),
-          const SizedBox(height: 6),
-
-          // 🕒 Action Time
-          Row(children: [
-            const Icon(Icons.schedule, size: 18),
-            const SizedBox(width: 6),
-            Text('Action Time : $actionTime'),
-          ]),
+          const SizedBox(height: 8),
+          const Divider(thickness: 1),
           const SizedBox(height: 8),
 
-          // ✅ Colored status tag only (removed Status: row)
+          // ⏰ Timeslot, Date, and Action Time
+          _infoRow(Icons.access_time, "Time Slot : $timeslot"),
+          const SizedBox(height: 6),
+          _infoRow(Icons.calendar_today, "Date : $date"),
+          const SizedBox(height: 6),
+          _infoRow(Icons.schedule, "Action Time : $actionTime"),
+          const SizedBox(height: 10),
+
+          // ✅ Status Tag
           Align(
             alignment: Alignment.centerLeft,
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 color: color,
-                borderRadius: BorderRadius.circular(6),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 status,
                 style: const TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.bold),
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 14),
               ),
             ),
           ),
           const SizedBox(height: 8),
 
           // 👤 Requested by
-          Text('Requested by : $requestedBy'),
+          Row(
+            children: [
+              const Icon(Icons.person_outline,
+                  color: Colors.indigo, size: 18),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  "Requested by: $requestedBy",
+                  style: const TextStyle(
+                      color: Colors.black87, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
+    );
+  }
+
+  Widget _infoRow(IconData icon, String text) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: Colors.indigo),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: const TextStyle(
+              fontSize: 15,
+              color: Colors.black87,
+              fontWeight: FontWeight.w500),
+        ),
+      ],
     );
   }
 }

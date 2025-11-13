@@ -28,6 +28,7 @@ class _BrowseRoomPageState extends State<BrowseRoomPage> {
   void initState() {
     super.initState();
     _loadRooms();
+    // Auto-refresh every 30s
     Future.doWhile(() async {
       await Future.delayed(const Duration(seconds: 30));
       if (!mounted) return false;
@@ -41,11 +42,21 @@ class _BrowseRoomPageState extends State<BrowseRoomPage> {
 
   Future<void> _loadRooms() async {
     setState(() => loading = true);
+
     final r = await ApiService.getRooms();
     final statuses = await ApiService.getRoomStatuses(todayDate);
+
+    // 🧠 Convert backend structure to simplified map for each room
+    final Map<String, Map<String, String>> parsedStatuses = {};
+    statuses.forEach((id, data) {
+      if (data is Map && data['slots'] != null) {
+        parsedStatuses[id.toString()] = Map<String, String>.from(data['slots']);
+      }
+    });
+
     setState(() {
       rooms = r;
-      roomStatuses = statuses;
+      roomStatuses = parsedStatuses;
       loading = false;
     });
   }
@@ -236,34 +247,22 @@ class _BrowseRoomPageState extends State<BrowseRoomPage> {
                         children: [
                           Row(
                             children: [
-                              const Icon(
-                                Icons.calendar_today,
-                                color: Colors.indigo,
-                                size: 20,
-                              ),
+                              const Icon(Icons.calendar_today,
+                                  color: Colors.indigo, size: 20),
                               const SizedBox(width: 5),
-                              Text(
-                                todayDate,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+                              Text(todayDate,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600)),
                             ],
                           ),
                           Row(
                             children: [
-                              const Icon(
-                                Icons.access_time,
-                                color: Colors.indigo,
-                                size: 20,
-                              ),
+                              const Icon(Icons.access_time,
+                                  color: Colors.indigo, size: 20),
                               const SizedBox(width: 5),
-                              Text(
-                                currentTime,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+                              Text(currentTime,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600)),
                             ],
                           ),
                         ],
@@ -358,14 +357,12 @@ class RoomCard extends StatelessWidget {
                 context: context,
                 builder: (ctx) => AlertDialog(
                   title: const Text("Time Slot Expired"),
-                  content: const Text(
-                    "This time slot can no longer be reserved.",
-                  ),
+                  content:
+                      const Text("This time slot can no longer be reserved."),
                   actions: [
                     TextButton(
-                      onPressed: () => Navigator.pop(ctx),
-                      child: const Text("OK"),
-                    ),
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text("OK")),
                   ],
                 ),
               );
@@ -380,9 +377,7 @@ class RoomCard extends StatelessWidget {
           label: Text(
             "$time  •  ${status == 'Approved' ? 'Reserved' : status}",
             style: TextStyle(
-              color: color.withOpacity(
-                0.9,
-              ), // ✅ fixed: works for all color types
+              color: color.withOpacity(0.9),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -406,41 +401,23 @@ class RoomCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.meeting_room, color: Colors.indigo),
-                  const SizedBox(width: 6),
-                  Text(
-                    roomName,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
-                    ),
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.location_city,
-                    size: 18,
-                    color: Colors.indigo,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    building,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
+          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+            Row(children: [
+              const Icon(Icons.meeting_room, color: Colors.indigo),
+              const SizedBox(width: 6),
+              Text(roomName,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 16)),
+            ]),
+            Row(children: [
+              const Icon(Icons.location_city,
+                  size: 18, color: Colors.indigo),
+              const SizedBox(width: 4),
+              Text(building,
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w500, fontSize: 14)),
+            ]),
+          ]),
           const SizedBox(height: 12),
           const Divider(thickness: 1.2),
           const SizedBox(height: 10),

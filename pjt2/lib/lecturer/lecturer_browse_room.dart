@@ -1,5 +1,3 @@
-
-
 import 'package:flutter/material.dart';
 import '../main.dart';
 import 'lecturer_home.dart';
@@ -31,14 +29,11 @@ class _LecturerBrowseRoomPageState extends State<LecturerBrowseRoomPage> {
     final parts = slotRange.split('-').map((e) => int.parse(e)).toList();
     final endHour = parts[1];
     int endMinutes = 0;
-
     final curParts = currentTime.split(":").map(int.parse).toList();
     int curH = curParts[0];
     int curM = curParts[1];
-
     int currentTotal = curH * 60 + curM;
     int endTotal = endHour * 60 + endMinutes;
-
     return currentTotal >= (endTotal - 30);
   }
 
@@ -50,73 +45,100 @@ class _LecturerBrowseRoomPageState extends State<LecturerBrowseRoomPage> {
         .toList();
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("Lecturer - Browse Room"),
-        titleTextStyle: const TextStyle(color: Colors.black, fontSize: 20, fontWeight: FontWeight.bold),
-        backgroundColor: Colors.grey[300],
-        actions: [IconButton(icon: const Icon(Icons.logout), onPressed: () => logout(context))],
-      ),
+      
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 🕓 Date + Time Header
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.indigo[300],
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          // 🗓️ Header
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.indigo[300],
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                    color: Colors.indigo.withOpacity(0.2),
+                    blurRadius: 6,
+                    offset: const Offset(0, 3))
+              ],
+            ),
+            child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(children: [
-                    const Icon(Icons.calendar_today, color: Colors.white),
-                    const SizedBox(width: 6),
-                    Text(todayDate,
-                        style: const TextStyle(color: Colors.white, fontSize: 16)),
-                  ]),
-                  Row(children: [
-                    const Icon(Icons.access_time, color: Colors.white),
-                    const SizedBox(width: 6),
-                    Text(currentTime,
-                        style: const TextStyle(color: Colors.white, fontSize: 16)),
-                  ]),
-                ],
+                  const Text("Browse All Rooms",
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white)),
+                  const SizedBox(height: 4),
+                  Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(children: [
+                          const Icon(Icons.calendar_today,
+                              color: Colors.white, size: 18),
+                          const SizedBox(width: 6),
+                          Text(todayDate,
+                              style: const TextStyle(color: Colors.white70)),
+                        ]),
+                        Row(children: [
+                          const Icon(Icons.access_time,
+                              color: Colors.white, size: 18),
+                          const SizedBox(width: 6),
+                          Text(currentTime,
+                              style: const TextStyle(color: Colors.white70)),
+                        ]),
+                      ]),
+                ]),
+          ),
+          const SizedBox(height: 16),
+
+          // 🔍 Search
+          TextField(
+            onChanged: (v) => setState(() => searchQuery = v),
+            decoration: InputDecoration(
+              hintText: "Search rooms by name...",
+              prefixIcon: const Icon(Icons.search),
+              filled: true,
+              fillColor: Colors.white,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: Colors.grey.shade300),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: Colors.indigo, width: 1.5),
               ),
             ),
-            const SizedBox(height: 16),
+          ),
+          const SizedBox(height: 16),
 
-            // 🔍 Search bar
-            TextField(
-              onChanged: (v) => setState(() => searchQuery = v),
-              decoration: InputDecoration(
-                prefixIcon: const Icon(Icons.search),
-                hintText: "Search rooms by name...",
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-              ),
+          if (filteredRooms.isEmpty)
+            const Center(
+              child: Text("No rooms found",
+                  style: TextStyle(color: Colors.black54, fontSize: 16)),
+            )
+          else
+            Column(
+              children: [
+                for (var r in filteredRooms)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: _RoomCardViewOnly(
+                      roomName: r,
+                      building: AppData.roomBuildings[r] ?? 'Unknown',
+                      currentTime: currentTime,
+                      isTimePassed: isTimePassed,
+                    ),
+                  ),
+              ],
             ),
-            const SizedBox(height: 16),
-
-            if (filteredRooms.isEmpty)
-              const Center(
-                  child: Text("No rooms found",
-                      style: TextStyle(color: Colors.black54))),
-
-            for (var r in filteredRooms)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: _RoomCardViewOnly(
-                  r,
-                  AppData.roomBuildings[r] ?? 'Unknown',
-                  currentTime,
-                  isTimePassed,
-                ),
-              ),
-          ],
-        ),
+        ]),
       ),
     );
   }
@@ -126,7 +148,12 @@ class _RoomCardViewOnly extends StatelessWidget {
   final String roomName, building, currentTime;
   final bool Function(String, String) isTimePassed;
 
-  const _RoomCardViewOnly(this.roomName, this.building, this.currentTime, this.isTimePassed);
+  const _RoomCardViewOnly({
+    required this.roomName,
+    required this.building,
+    required this.currentTime,
+    required this.isTimePassed,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -145,35 +172,56 @@ class _RoomCardViewOnly extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        color: Colors.grey[100],
-        border: Border.all(color: Colors.grey.shade300),
+        boxShadow: [
+          BoxShadow(
+              color: Colors.black12, blurRadius: 6, offset: const Offset(0, 3))
+        ],
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           Row(children: [
-            const Icon(Icons.meeting_room),
+            const Icon(Icons.meeting_room, color: Colors.indigo),
             const SizedBox(width: 6),
-            Text(roomName, style: const TextStyle(fontWeight: FontWeight.bold))
+            Text(roomName,
+                style:
+                    const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
           ]),
           Row(children: [
-            const Icon(Icons.location_city, size: 18),
+            const Icon(Icons.location_city, size: 18, color: Colors.grey),
             const SizedBox(width: 4),
-            Text(building),
+            Text(building, style: const TextStyle(color: Colors.black54)),
           ]),
         ]),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
         const Divider(thickness: 1),
-        const SizedBox(height: 12),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          _SlotBadge("8-10", map['8-10']!, colorFor(map['8-10']!, "8-10")),
-          _SlotBadge("10-12", map['10-12']!, colorFor(map['10-12']!, "10-12")),
-        ]),
         const SizedBox(height: 8),
-        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          _SlotBadge("13-15", map['13-15']!, colorFor(map['13-15']!, "13-15")),
-          _SlotBadge("15-17", map['15-17']!, colorFor(map['15-17']!, "15-17")),
-        ]),
+        Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _SlotBadge(
+                  label: "8-10",
+                  status: map['8-10']!,
+                  color: colorFor(map['8-10']!, "8-10")),
+              _SlotBadge(
+                  label: "10-12",
+                  status: map['10-12']!,
+                  color: colorFor(map['10-12']!, "10-12")),
+            ]),
+        const SizedBox(height: 8),
+        Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _SlotBadge(
+                  label: "13-15",
+                  status: map['13-15']!,
+                  color: colorFor(map['13-15']!, "13-15")),
+              _SlotBadge(
+                  label: "15-17",
+                  status: map['15-17']!,
+                  color: colorFor(map['15-17']!, "15-17")),
+            ]),
       ]),
     );
   }
@@ -183,22 +231,27 @@ class _SlotBadge extends StatelessWidget {
   final String label, status;
   final Color color;
 
-  const _SlotBadge(this.label, this.status, this.color);
+  const _SlotBadge(
+      {required this.label, required this.status, required this.color});
 
   @override
   Widget build(BuildContext context) {
-    return TextButton(
-      onPressed: null,
-      style: TextButton.styleFrom(
-        backgroundColor: color.withOpacity(0.2),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(Icons.access_time, size: 16, color: color),
-        const SizedBox(width: 4),
-        Text(label, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
         const SizedBox(width: 6),
-        Text(status, style: const TextStyle(color: Colors.indigo, fontWeight: FontWeight.w500)),
+        Text(label,
+            style:
+                TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: color)),
+        const SizedBox(width: 6),
+        Text(status,
+            style: const TextStyle(
+                color: Colors.indigo, fontWeight: FontWeight.w500, fontSize: 14)),
       ]),
     );
   }

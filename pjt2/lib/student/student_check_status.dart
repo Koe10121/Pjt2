@@ -33,7 +33,8 @@ class _StudentCheckStatusPageState extends State<StudentCheckStatusPage> {
       (b) =>
           (b['date'] ?? '') == today &&
           ((b['status'] ?? '') == 'Pending' ||
-              (b['status'] ?? '') == 'Approved'),
+              (b['status'] ?? '') == 'Approved' ||
+              (b['status'] ?? '') == 'Rejected'),
       orElse: () => null,
     );
     setState(() {

@@ -1,8 +1,8 @@
-// app.js
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
 import mysql from "mysql2";
+import bcrypt from "bcrypt";
 
 const app = express();
 app.use(cors());
@@ -30,25 +30,45 @@ app.get("/", (req, res) => res.send("MFU Room Reservation Backend is running!"))
 // ---------------- LOGIN ----------------
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
-  const sql = "SELECT id, username, role FROM users WHERE username = ? AND password = ?";
-  db.query(sql, [username, password], (err, result) => {
+  const sql = "SELECT id, username, password, role FROM users WHERE username = ?";
+  
+  db.query(sql, [username], async (err, results) => {
     if (err) return res.status(500).json({ user: null, msg: "Database error during login." });
-    if (result.length > 0) return res.json({ user: result[0], msg: "Login successful." });
-    return res.json({ user: null, msg: "Incorrect username or password." });
+    if (results.length === 0) return res.json({ user: null, msg: "Incorrect username or password." });
+
+    const user = results[0];
+    const match = await bcrypt.compare(password, user.password);
+
+    if (!match) return res.json({ user: null, msg: "Incorrect username or password." });
+
+    // remove password before sending
+    delete user.password;
+    return res.json({ user, msg: "Login successful." });
   });
 });
 
 // ---------------- REGISTER ----------------
-app.post("/register", (req, res) => {
+app.post("/register", async (req, res) => {
   const { username, password } = req.body;
-  const sql = "INSERT INTO users (username, password, role) VALUES (?, ?, 'student')";
-  db.query(sql, [username, password], (err) => {
-    if (err) {
-      if (err.code === "ER_DUP_ENTRY") return res.json({ ok: false, msg: "Username already exists." });
-      return res.json({ ok: false, msg: "Database error." });
-    }
-    return res.json({ ok: true, msg: "Registration successful." });
-  });
+  if (!username || !password) {
+    return res.json({ ok: false, msg: "Username and password are required." });
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const sql = "INSERT INTO users (username, password, role) VALUES (?, ?, 'student')";
+    db.query(sql, [username, hashedPassword], (err) => {
+      if (err) {
+        if (err.code === "ER_DUP_ENTRY") {
+          return res.json({ ok: false, msg: "Username already exists." });
+        }
+        return res.json({ ok: false, msg: "Database error." });
+      }
+      return res.json({ ok: true, msg: "Registration successful (password secured)." });
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, msg: "Server error during registration." });
+  }
 });
 
 // ---------------- ROOMS ----------------
@@ -61,7 +81,6 @@ app.get("/rooms", (req, res) => {
       building: r.building,
       disabled: r.is_disabled ? 1 : 0
     }));
-    // ⚠️ Do NOT wrap, return plain array like before (so UI still works)
     res.json(out);
   });
 });
@@ -87,12 +106,10 @@ app.get("/bookings/:userId", (req, res) => {
   `;
   db.query(sql, [userId], (err, rows) => {
     if (err) return res.status(500).json({ error: "db_error", msg: "Database error fetching bookings." });
-    // ⚠️ UI expects an array directly
     res.json(rows);
   });
 });
 
-// ---------------- BOOK ----------------
 // ---------------- BOOK ----------------
 app.post("/book", (req, res) => {
   const { userId, roomId, timeslot } = req.body;
@@ -102,7 +119,6 @@ app.post("/book", (req, res) => {
     return res.json({ ok: false, msg: "Missing userId, roomId, or timeslot." });
   }
 
-  // ✅ Step 1: Check if the room is disabled
   const roomCheckSql = "SELECT is_disabled FROM rooms WHERE id = ?";
   db.query(roomCheckSql, [roomId], (err, rows) => {
     if (err) return res.json({ ok: false, msg: "Database error while checking room." });
@@ -113,7 +129,6 @@ app.post("/book", (req, res) => {
       return res.json({ ok: false, msg: "This room is currently disabled." });
     }
 
-    // ✅ Step 2: Time validation
     const [_, endHourStr] = timeslot.split("-");
     const endHour = parseInt(endHourStr);
 
@@ -126,10 +141,9 @@ app.post("/book", (req, res) => {
     const currentTotal = currentHour * 60 + currentMinute;
     const endTotal = endHour * 60;
 
-    if (currentTotal >= endTotal-30)
+    if (currentTotal >= endTotal - 30)
       return res.json({ ok: false, msg: "This time slot has already passed." });
 
-    // ✅ Step 3: Check if user already has an active booking
     const checkSql = `
       SELECT * FROM bookings
       WHERE user_id = ? AND date = ?
@@ -140,7 +154,6 @@ app.post("/book", (req, res) => {
       if (existing.length > 0)
         return res.json({ ok: false, msg: "You already have an active booking today." });
 
-      // ✅ Step 4: Check if slot already booked
       const slotSql = `
         SELECT * FROM bookings
         WHERE room_id = ? AND timeslot = ? AND date = ?
@@ -151,7 +164,6 @@ app.post("/book", (req, res) => {
         if (slot.length > 0)
           return res.json({ ok: false, msg: "This time slot is not available." });
 
-        // ✅ Step 5: Insert booking
         const insertSql = `
           INSERT INTO bookings (user_id, room_id, timeslot, date, time, status)
           VALUES (?, ?, ?, ?, CURTIME(), 'Pending')
@@ -165,28 +177,133 @@ app.post("/book", (req, res) => {
   });
 });
 
-
-// ---------------- ROOM STATUSES ----------------
+// ---------------- ROOM STATUSES (FOR A GIVEN DATE) ----------------
 app.get("/room-statuses/:date", (req, res) => {
   const date = req.params.date;
   const sql = `
-    SELECT r.id AS room_id, r.name AS room_name, b.timeslot, b.status
+    SELECT 
+      r.id AS room_id, r.name AS room_name, r.building, r.is_disabled,
+      b.timeslot, b.status
     FROM rooms r
-    LEFT JOIN bookings b ON r.id = b.room_id AND b.date = ?
+    LEFT JOIN bookings b ON r.id = b.room_id AND DATE(b.date) = ?
     ORDER BY r.id
   `;
   db.query(sql, [date], (err, rows) => {
     if (err) return res.status(500).json({ error: "db_error", msg: "Database error fetching statuses." });
+
     const map = {};
     rows.forEach(row => {
       const rid = row.room_id;
-      if (!map[rid]) map[rid] = {};
-      if (row.timeslot) map[rid][row.timeslot] = row.status;
+      if (!map[rid]) {
+        map[rid] = {
+          room_name: row.room_name,
+          building: row.building,
+          disabled: row.is_disabled ? 1 : 0,
+          slots: { "8-10": "Free", "10-12": "Free", "13-15": "Free", "15-17": "Free" }
+        };
+      }
+      if (row.is_disabled === 1) {
+        map[rid].slots = {
+          "8-10": "Disabled",
+          "10-12": "Disabled",
+          "13-15": "Disabled",
+          "15-17": "Disabled"
+        };
+      } else if (row.timeslot) {
+        map[rid].slots[row.timeslot] = row.status || "Free";
+      }
     });
-    // ⚠️ UI expects plain map
     res.json(map);
   });
 });
+
+
+// ---------------- LECTURER: GET TODAY'S PENDING REQUESTS ----------------
+app.get("/lecturer/requests", (req, res) => {
+  const sql = `
+    SELECT 
+      b.id, 
+      b.timeslot, 
+      DATE_FORMAT(b.date, '%Y-%m-%d') AS date,
+      DATE_FORMAT(b.time, '%H:%i') AS time,
+      b.status,
+      r.name AS room, 
+      r.building,
+      u.username AS requestedBy
+    FROM bookings b
+    JOIN rooms r ON b.room_id = r.id
+    JOIN users u ON b.user_id = u.id
+    WHERE b.status = 'Pending' AND DATE(b.date) = CURDATE()
+    ORDER BY b.id DESC
+  `;
+  db.query(sql, (err, rows) => {
+    if (err) {
+      console.error("Error fetching lecturer requests:", err);
+      return res.status(500).json({ ok: false, msg: "Database error fetching today's pending requests." });
+    }
+    res.json(rows);
+  });
+});
+
+
+// ---------------- LECTURER: APPROVE or REJECT REQUEST ----------------
+app.post("/lecturer/action", (req, res) => {
+  const { lecturerId, bookingId, status } = req.body;
+  
+  if (!lecturerId || !bookingId || !status)
+    return res.json({ ok: false, msg: "Missing lecturerId, bookingId, or status." });
+
+  if (!["Approved", "Rejected"].includes(status))
+    return res.json({ ok: false, msg: "Invalid status value." });
+
+  const sql = `
+    UPDATE bookings
+    SET status = ?, action_by = ?, time = CURTIME()
+    WHERE id = ?
+  `;
+
+  db.query(sql, [status, lecturerId, bookingId], (err, result) => {
+    if (err) {
+      console.error("Error updating booking:", err);
+      return res.json({ ok: false, msg: "Database error while updating booking." });
+    }
+    if (result.affectedRows === 0)
+      return res.json({ ok: false, msg: "Booking not found or already processed." });
+
+    res.json({ ok: true, msg: `Booking ${status.toLowerCase()} successfully.` });
+  });
+});
+
+// ---------------- LECTURER: HISTORY ----------------
+app.get("/lecturer/history/:lecturerId", (req, res) => {
+  const { lecturerId } = req.params;
+
+  const sql = `
+    SELECT 
+      b.id,
+      b.timeslot,
+      DATE_FORMAT(b.date, '%Y-%m-%d') AS date,
+      DATE_FORMAT(b.time, '%H:%i') AS time,
+      b.status,
+      r.name AS room,
+      r.building,
+      u.username AS requestedBy
+    FROM bookings b
+    JOIN rooms r ON b.room_id = r.id
+    JOIN users u ON b.user_id = u.id
+    WHERE b.action_by = ? AND (b.status = 'Approved' OR b.status = 'Rejected')
+    ORDER BY b.id DESC
+  `;
+
+  db.query(sql, [lecturerId], (err, rows) => {
+    if (err) {
+      console.error("Error fetching lecturer history:", err);
+      return res.status(500).json({ ok: false, msg: "Database error fetching lecturer history." });
+    }
+    res.json(rows);
+  });
+});
+
 
 const PORT = 3000;
 app.listen(PORT, () => {
