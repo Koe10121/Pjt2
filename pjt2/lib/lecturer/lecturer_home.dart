@@ -24,46 +24,53 @@ class _LecturerHomePageState extends State<LecturerHomePage> {
     _loadAllData();
   }
 
-  Future<void> _loadAllData() async {
-    setState(() => loading = true);
+ Future<void> _loadAllData() async {
+  setState(() => loading = true);
 
-    // 1️⃣ Load rooms
-    final rooms = await ApiService.getRooms();
-    AppData.slotStatus.clear();
-    AppData.roomBuildings.clear();
-    for (var room in rooms) {
-      AppData.slotStatus[room['name']] = {
-        '8-10': 'Free',
-        '10-12': 'Free',
-        '13-15': 'Free',
-        '15-17': 'Free',
-      };
-      AppData.roomBuildings[room['name']] = room['building'];
-    }
+  // 1️⃣ Load rooms
+  final rooms = await ApiService.getRooms();
+  AppData.slotStatus.clear();
+  AppData.roomBuildings.clear();
+  for (var room in rooms) {
+    AppData.slotStatus[room['name']] = {
+      '8-10': 'Free',
+      '10-12': 'Free',
+      '13-15': 'Free',
+      '15-17': 'Free',
+    };
+    AppData.roomBuildings[room['name']] = room['building'];
+  }
 
-    // 2️⃣ Load room statuses (mark Reserved/Pending)
-    final statuses = await ApiService.getRoomStatuses(AppData.todayDate);
-    statuses.forEach((roomId, map) {
-      for (var r in AppData.roomBuildings.keys) {
-        // link by room name match
-        final m = AppData.slotStatus[r];
-        if (m != null && map is Map) {
-          map.forEach((slot, status) {
+  // 2️⃣ Load today's room statuses
+  final statuses = await ApiService.getRoomStatuses(AppData.todayDate);
+  statuses.forEach((roomId, map) {
+    if (map is Map && map['room_name'] != null && map['slots'] != null) {
+      final rname = map['room_name'];
+      final m = AppData.slotStatus[rname];
+      if (m != null) {
+        final disabled = map['disabled'] == 1;
+        if (disabled) {
+          m.updateAll((key, value) => 'Disabled');
+        } else {
+          final slots = Map<String, dynamic>.from(map['slots']);
+          slots.forEach((slot, status) {
             m[slot] = status ?? 'Free';
           });
         }
       }
-    });
+    }
+  });
 
-    // 3️⃣ Load lecturer requests + history
-    AppData.lecturerRequests =
-        List<Map<String, dynamic>>.from(await ApiService.getLecturerRequests());
-    final id = AppData.currentUser?['id'] ?? 0;
-    AppData.lecturerHistory =
-        List<Map<String, dynamic>>.from(await ApiService.getLecturerHistory(id));
+  // 3️⃣ Load lecturer requests (today only) + history
+  AppData.lecturerRequests =
+      List<Map<String, dynamic>>.from(await ApiService.getLecturerRequests());
+  final id = AppData.currentUser?['id'] ?? 0;
+  AppData.lecturerHistory =
+      List<Map<String, dynamic>>.from(await ApiService.getLecturerHistory(id));
 
-    setState(() => loading = false);
-  }
+  setState(() => loading = false);
+}
+
 
   @override
   Widget build(BuildContext context) {

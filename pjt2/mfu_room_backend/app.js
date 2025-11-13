@@ -177,28 +177,48 @@ app.post("/book", (req, res) => {
   });
 });
 
-// ---------------- ROOM STATUSES ----------------
+// ---------------- ROOM STATUSES (FOR A GIVEN DATE) ----------------
 app.get("/room-statuses/:date", (req, res) => {
   const date = req.params.date;
   const sql = `
-    SELECT r.id AS room_id, r.name AS room_name, b.timeslot, b.status
+    SELECT 
+      r.id AS room_id, r.name AS room_name, r.building, r.is_disabled,
+      b.timeslot, b.status
     FROM rooms r
-    LEFT JOIN bookings b ON r.id = b.room_id AND b.date = ?
+    LEFT JOIN bookings b ON r.id = b.room_id AND DATE(b.date) = ?
     ORDER BY r.id
   `;
   db.query(sql, [date], (err, rows) => {
     if (err) return res.status(500).json({ error: "db_error", msg: "Database error fetching statuses." });
+
     const map = {};
     rows.forEach(row => {
       const rid = row.room_id;
-      if (!map[rid]) map[rid] = {};
-      if (row.timeslot) map[rid][row.timeslot] = row.status;
+      if (!map[rid]) {
+        map[rid] = {
+          room_name: row.room_name,
+          building: row.building,
+          disabled: row.is_disabled ? 1 : 0,
+          slots: { "8-10": "Free", "10-12": "Free", "13-15": "Free", "15-17": "Free" }
+        };
+      }
+      if (row.is_disabled === 1) {
+        map[rid].slots = {
+          "8-10": "Disabled",
+          "10-12": "Disabled",
+          "13-15": "Disabled",
+          "15-17": "Disabled"
+        };
+      } else if (row.timeslot) {
+        map[rid].slots[row.timeslot] = row.status || "Free";
+      }
     });
     res.json(map);
   });
 });
 
-// ---------------- LECTURER: GET PENDING REQUESTS ----------------
+
+// ---------------- LECTURER: GET TODAY'S PENDING REQUESTS ----------------
 app.get("/lecturer/requests", (req, res) => {
   const sql = `
     SELECT 
@@ -213,17 +233,18 @@ app.get("/lecturer/requests", (req, res) => {
     FROM bookings b
     JOIN rooms r ON b.room_id = r.id
     JOIN users u ON b.user_id = u.id
-    WHERE b.status = 'Pending'
+    WHERE b.status = 'Pending' AND DATE(b.date) = CURDATE()
     ORDER BY b.id DESC
   `;
   db.query(sql, (err, rows) => {
     if (err) {
       console.error("Error fetching lecturer requests:", err);
-      return res.status(500).json({ ok: false, msg: "Database error fetching pending requests." });
+      return res.status(500).json({ ok: false, msg: "Database error fetching today's pending requests." });
     }
     res.json(rows);
   });
 });
+
 
 // ---------------- LECTURER: APPROVE or REJECT REQUEST ----------------
 app.post("/lecturer/action", (req, res) => {
