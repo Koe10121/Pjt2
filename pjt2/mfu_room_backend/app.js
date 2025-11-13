@@ -249,28 +249,52 @@ app.get("/lecturer/requests", (req, res) => {
 // ---------------- LECTURER: APPROVE or REJECT REQUEST ----------------
 app.post("/lecturer/action", (req, res) => {
   const { lecturerId, bookingId, status } = req.body;
-  
+
   if (!lecturerId || !bookingId || !status)
     return res.json({ ok: false, msg: "Missing lecturerId, bookingId, or status." });
 
   if (!["Approved", "Rejected"].includes(status))
     return res.json({ ok: false, msg: "Invalid status value." });
 
-  const sql = `
-    UPDATE bookings
-    SET status = ?, action_by = ?, time = CURTIME()
-    WHERE id = ?
-  `;
+  // 1️⃣ Check if lecturerId belongs to lecturer
+  const checkLecturerSql = "SELECT role FROM users WHERE id = ?";
+  db.query(checkLecturerSql, [lecturerId], (err, rows) => {
+    if (err) return res.json({ ok: false, msg: "Database error (lecturer check)." });
+    if (rows.length === 0) return res.json({ ok: false, msg: "Lecturer not found." });
 
-  db.query(sql, [status, lecturerId, bookingId], (err, result) => {
-    if (err) {
-      console.error("Error updating booking:", err);
-      return res.json({ ok: false, msg: "Database error while updating booking." });
+    if (rows[0].role !== "lecturer") {
+      return res.json({ ok: false, msg: "Only lecturers can approve or reject." });
     }
-    if (result.affectedRows === 0)
-      return res.json({ ok: false, msg: "Booking not found or already processed." });
 
-    res.json({ ok: true, msg: `Booking ${status.toLowerCase()} successfully.` });
+    // 2️⃣ Check booking exists, is Pending, and is for today
+    const checkBookingSql = `
+      SELECT * FROM bookings
+      WHERE id = ? AND DATE(date) = CURDATE()
+    `;
+    db.query(checkBookingSql, [bookingId], (err, bookingRows) => {
+      if (err) return res.json({ ok: false, msg: "Database error (booking check)." });
+      if (bookingRows.length === 0)
+        return res.json({ ok: false, msg: "Booking not found or not from today." });
+
+      const booking = bookingRows[0];
+
+      if (booking.status !== "Pending") {
+        return res.json({ ok: false, msg: "This booking is already processed." });
+      }
+
+      // 3️⃣ Update booking (safe)
+      const updateSql = `
+        UPDATE bookings
+        SET status = ?, action_by = ?, time = CURTIME()
+        WHERE id = ?
+      `;
+      db.query(updateSql, [status, lecturerId, bookingId], (err) => {
+        if (err) {
+          return res.json({ ok: false, msg: "Error updating booking." });
+        }
+        return res.json({ ok: true, msg: `Booking ${status} successfully.` });
+      });
+    });
   });
 });
 
