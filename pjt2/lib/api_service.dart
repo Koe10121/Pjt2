@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 
 class ApiService {
   
-  static const base = 'http://192.168.1.105:3000';
+  static const base = 'http://172.27.21.103:3000';
 
  // 🧑‍🏫 Lecturer: get all pending requests
   static Future<List<dynamic>> getLecturerRequests() async {

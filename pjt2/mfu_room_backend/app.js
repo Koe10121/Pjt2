@@ -31,7 +31,7 @@ app.get("/", (req, res) => res.send("MFU Room Reservation Backend is running!"))
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
   const sql = "SELECT id, username, password, role FROM users WHERE username = ?";
-  
+
   db.query(sql, [username], async (err, results) => {
     if (err) return res.status(500).json({ user: null, msg: "Database error during login." });
     if (results.length === 0) return res.json({ user: null, msg: "Incorrect username or password." });
@@ -210,7 +210,14 @@ app.get("/room-statuses/:date", (req, res) => {
           "15-17": "Disabled"
         };
       } else if (row.timeslot) {
-        map[rid].slots[row.timeslot] = row.status || "Free";
+        if (row.status === "Approved") {
+          map[rid].slots[row.timeslot] = "Approved";
+        } else if (row.status === "Pending") {
+          map[rid].slots[row.timeslot] = "Pending";
+        } else {
+          // Rejected OR any other non-blocking status → treat as Free
+          map[rid].slots[row.timeslot] = "Free";
+        }
       }
     });
     res.json(map);
