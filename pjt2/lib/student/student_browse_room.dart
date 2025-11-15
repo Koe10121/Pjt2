@@ -247,22 +247,34 @@ class _BrowseRoomPageState extends State<BrowseRoomPage> {
                         children: [
                           Row(
                             children: [
-                              const Icon(Icons.calendar_today,
-                                  color: Colors.indigo, size: 20),
+                              const Icon(
+                                Icons.calendar_today,
+                                color: Colors.indigo,
+                                size: 20,
+                              ),
                               const SizedBox(width: 5),
-                              Text(todayDate,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w600)),
+                              Text(
+                                todayDate,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ],
                           ),
                           Row(
                             children: [
-                              const Icon(Icons.access_time,
-                                  color: Colors.indigo, size: 20),
+                              const Icon(
+                                Icons.access_time,
+                                color: Colors.indigo,
+                                size: 20,
+                              ),
                               const SizedBox(width: 5),
-                              Text(currentTime,
-                                  style: const TextStyle(
-                                      fontWeight: FontWeight.w600)),
+                              Text(
+                                currentTime,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
                             ],
                           ),
                         ],
@@ -321,32 +333,53 @@ class RoomCard extends StatelessWidget {
 
     Widget buildSlot(String time) {
       String status = "Free";
-      Color color = Colors.green;
 
+      // Default FREE colors
+      Color borderColor = Colors.green;
+      Color bgColor = Colors.green.withOpacity(0.18);
+      Color textColor = Colors.black;
+
+      // If room is disabled
       if (isDisabled) {
         status = "Disabled";
-        color = Colors.grey;
+        borderColor = Colors.grey;
+        bgColor = Colors.grey.withOpacity(0.22);
+        textColor = Colors.black;
       }
 
+      // Backend statuses override
       final backendStatus = roomStatusesForThisRoom[time];
       if (backendStatus != null) {
-        status = backendStatus as String;
-        if (status == 'Pending') color = Colors.amber;
-        if (status == 'Approved') color = Colors.red;
+        status = backendStatus;
+
+        if (status == "Pending") {
+          borderColor = Colors.amber;
+          bgColor = Colors.amber.withOpacity(0.22);
+          textColor = Colors.black;
+        } else if (status == "Approved") {
+          borderColor = Colors.red;
+          bgColor = Colors.red.withOpacity(0.20);
+          textColor = Colors.black;
+        }
       }
 
+      // Expired Free Slot
       final isPast = isTimePassed(time, currentTime);
-      if (status == "Free" && isPast) color = Colors.grey;
+      if (status == "Free" && isPast) {
+        borderColor = Colors.grey;
+        bgColor = Colors.grey.withOpacity(0.22);
+        textColor = Colors.black;
+      }
 
       return Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
         child: ElevatedButton.icon(
           style: ElevatedButton.styleFrom(
-            backgroundColor: color.withOpacity(0.15),
+            backgroundColor: bgColor,
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(30),
-              side: BorderSide(color: color, width: 1),
+              side: BorderSide(color: borderColor, width: 1),
             ),
           ),
           onPressed: () {
@@ -357,29 +390,28 @@ class RoomCard extends StatelessWidget {
                 context: context,
                 builder: (ctx) => AlertDialog(
                   title: const Text("Time Slot Expired"),
-                  content:
-                      const Text("This time slot can no longer be reserved."),
+                  content: const Text(
+                    "This time slot can no longer be reserved.",
+                  ),
                   actions: [
                     TextButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text("OK")),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text("OK"),
+                    ),
                   ],
                 ),
               );
             } else {
               showDialog(
                 context: context,
-                builder: (context) => const RoomUnavailableDialog(),
+                builder: (ctx) => const RoomUnavailableDialog(),
               );
             }
           },
-          icon: Icon(Icons.access_time, size: 18, color: color),
+          icon: Icon(Icons.access_time, size: 18, color: borderColor),
           label: Text(
             "$time  •  ${status == 'Approved' ? 'Reserved' : status}",
-            style: TextStyle(
-              color: color.withOpacity(0.9),
-              fontWeight: FontWeight.w600,
-            ),
+            style: TextStyle(color: textColor, fontWeight: FontWeight.w600),
           ),
         ),
       );
@@ -401,26 +433,46 @@ class RoomCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Row(children: [
-              const Icon(Icons.meeting_room, color: Colors.indigo),
-              const SizedBox(width: 6),
-              Text(roomName,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16)),
-            ]),
-            Row(children: [
-              const Icon(Icons.location_city,
-                  size: 18, color: Colors.indigo),
-              const SizedBox(width: 4),
-              Text(building,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w500, fontSize: 14)),
-            ]),
-          ]),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.meeting_room, color: Colors.indigo),
+                  const SizedBox(width: 6),
+                  Text(
+                    roomName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.location_city,
+                    size: 18,
+                    color: Colors.indigo,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    building,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
           const Divider(thickness: 1.2),
           const SizedBox(height: 10),
+
+          // Slots
           Wrap(
             spacing: 10,
             runSpacing: 8,

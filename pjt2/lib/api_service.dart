@@ -3,13 +3,23 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  
-  static const base = 'http://172.27.21.103:3000';
+  static const base = 'http://192.168.1.105:3000';
 
- // 🧑‍🏫 Lecturer: get all pending requests
+  // stored token after login
+  static String? token;
+
+  // helper to build headers (includes token if available)
+  static Map<String, String> _headers({bool json = true}) {
+    final h = <String, String>{};
+    if (json) h['Content-Type'] = 'application/json';
+    if (token != null) h['Authorization'] = 'Bearer $token';
+    return h;
+  }
+
+  // 🧑‍🏫 Lecturer: get all pending requests (requires token)
   static Future<List<dynamic>> getLecturerRequests() async {
     try {
-      final res = await http.get(Uri.parse('$base/lecturer/requests'));
+      final res = await http.get(Uri.parse('$base/lecturer/requests'), headers: _headers());
       if (res.statusCode != 200) return [];
       return jsonDecode(res.body) as List<dynamic>;
     } catch (e) {
@@ -23,7 +33,7 @@ class ApiService {
     try {
       final res = await http.post(
         Uri.parse('$base/lecturer/action'),
-        headers: {'Content-Type': 'application/json'},
+        headers: _headers(),
         body: jsonEncode({
           'lecturerId': lecturerId,
           'bookingId': bookingId,
@@ -40,7 +50,7 @@ class ApiService {
   // 🧑‍🏫 Lecturer: get history
   static Future<List<dynamic>> getLecturerHistory(int lecturerId) async {
     try {
-      final res = await http.get(Uri.parse('$base/lecturer/history/$lecturerId'));
+      final res = await http.get(Uri.parse('$base/lecturer/history/$lecturerId'), headers: _headers());
       if (res.statusCode != 200) return [];
       return jsonDecode(res.body) as List<dynamic>;
     } catch (e) {
@@ -49,7 +59,8 @@ class ApiService {
     }
   }
 
-  // 🧍 LOGIN
+  // 🧍 LOGIN (now saves token)
+  // Returns the user map on success, null on failure
   static Future<Map<String, dynamic>?> login(String username, String password) async {
     try {
       final res = await http.post(
@@ -60,6 +71,8 @@ class ApiService {
       if (res.statusCode != 200) return null;
       final data = jsonDecode(res.body);
       final user = data['user'];
+      final tok = data['token'];
+      if (tok != null) token = tok as String;
       return user != null ? Map<String, dynamic>.from(user) : null;
     } catch (e) {
       print('Login error: $e');
@@ -67,7 +80,7 @@ class ApiService {
     }
   }
 
-  // 📝 REGISTER (student only)
+  // 📝 REGISTER (student only) — stays open
   static Future<bool> register(String username, String password) async {
     try {
       final res = await http.post(
@@ -84,10 +97,10 @@ class ApiService {
     }
   }
 
-  // 🏠 Get all rooms
+  // 🏠 Get all rooms (authenticated)
   static Future<List<dynamic>> getRooms() async {
     try {
-      final res = await http.get(Uri.parse('$base/rooms'));
+      final res = await http.get(Uri.parse('$base/rooms'), headers: _headers());
       if (res.statusCode != 200) return [];
       return jsonDecode(res.body) as List<dynamic>;
     } catch (e) {
@@ -96,10 +109,10 @@ class ApiService {
     }
   }
 
-  // 📖 Get all bookings for a specific user
+  // 📖 Get all bookings for a specific user (authenticated)
   static Future<List<dynamic>> getBookings(int userId) async {
     try {
-      final res = await http.get(Uri.parse('$base/bookings/$userId'));
+      final res = await http.get(Uri.parse('$base/bookings/$userId'), headers: _headers());
       if (res.statusCode != 200) return [];
       return jsonDecode(res.body) as List<dynamic>;
     } catch (e) {
@@ -108,12 +121,12 @@ class ApiService {
     }
   }
 
-  // 🧾 Book a room
+  // 🧾 Book a room (authenticated)
   static Future<Map<String, dynamic>> bookRoom(int userId, int roomId, String timeslot) async {
     try {
       final res = await http.post(
         Uri.parse('$base/book'),
-        headers: {'Content-Type': 'application/json'},
+        headers: _headers(),
         body: jsonEncode({'userId': userId, 'roomId': roomId, 'timeslot': timeslot}),
       );
       return jsonDecode(res.body) as Map<String, dynamic>;
@@ -123,10 +136,10 @@ class ApiService {
     }
   }
 
-  // 🕒 NEW: Get room statuses (for showing Pending / Approved / Free)
+  // 🕒 Get room statuses for a date (authenticated)
   static Future<Map<String, dynamic>> getRoomStatuses(String date) async {
     try {
-      final res = await http.get(Uri.parse('$base/room-statuses/$date'));
+      final res = await http.get(Uri.parse('$base/room-statuses/$date'), headers: _headers());
       if (res.statusCode != 200) return {};
       return jsonDecode(res.body) as Map<String, dynamic>;
     } catch (e) {
@@ -135,6 +148,3 @@ class ApiService {
     }
   }
 }
-
-
-
