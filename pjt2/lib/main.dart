@@ -103,24 +103,54 @@ class AppData {
   }
 }
 
-void main() {
-  runApp(const MyApp());
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // Load saved token & user before app runs
+  final loadedToken = await ApiService.loadToken();
+  final loadedUser = await ApiService.loadUser();
+
+  if (loadedToken != null && loadedUser != null) {
+    AppData.currentUser = loadedUser;
+  }
+
+  runApp(MyApp(
+    autoUser: loadedUser,
+  ));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  final Map<String, dynamic>? autoUser;
+  const MyApp({super.key, required this.autoUser});
 
   @override
   Widget build(BuildContext context) {
+    Widget startPage;
+
+    if (autoUser == null) {
+      // no saved login
+      startPage = const LoginPage();
+    } else {
+      if (autoUser!['role'] == 'student') {
+        startPage = StudentHomePage(
+          userId: autoUser!['id'],
+          username: autoUser!['username'],
+        );
+      } else {
+        startPage = const LecturerHomePage();
+      }
+    }
+
     return MaterialApp(
       title: 'MFU Room Reservation',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primarySwatch: Colors.indigo),
-      home: const LoginPage(),
+      home: startPage,
       routes: {'/register': (_) => const RegisterPage()},
     );
   }
 }
+
 
 
 
