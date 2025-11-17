@@ -1,3 +1,4 @@
+// lib/student/student_check_status.dart
 import 'package:flutter/material.dart';
 import '../api_service.dart';
 import '../main.dart';
@@ -27,21 +28,28 @@ class _StudentCheckStatusPageState extends State<StudentCheckStatusPage> {
 
   Future<void> loadBooking() async {
     setState(() => loading = true);
-    final bookings = await ApiService.getBookings(widget.userId);
-    final today = AppData.todayDate;
-    final latest = bookings.firstWhere(
-      (b) =>
-          (b['date'] ?? '') == today &&
-          ((b['status'] ?? '') == 'Pending' ||
-              (b['status'] ?? '') == 'Approved' ||
-              (b['status'] ?? '') == 'Rejected'),
-      orElse: () => null,
-    );
-    setState(() {
-      currentBooking =
-          latest != null ? Map<String, dynamic>.from(latest) : null;
-      loading = false;
-    });
+    try {
+      final bookings = await ApiService.getBookings(widget.userId);
+      final today = AppData.todayDate;
+      final latest = bookings.firstWhere(
+        (b) =>
+            (b['date'] ?? '') == today &&
+            ((b['status'] ?? '') == 'Pending' ||
+                (b['status'] ?? '') == 'Approved' ||
+                (b['status'] ?? '') == 'Rejected'),
+        orElse: () => null,
+      );
+      setState(() {
+        currentBooking =
+            latest != null ? Map<String, dynamic>.from(latest) : null;
+        loading = false;
+      });
+    } on UnauthorizedException {
+      AppData.performLogout(context);
+    } catch (e) {
+      print('loadBooking error: $e');
+      setState(() => loading = false);
+    }
   }
 
   void logout(BuildContext context) {
@@ -58,11 +66,11 @@ class _StudentCheckStatusPageState extends State<StudentCheckStatusPage> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
-              Navigator.pushNamedAndRemoveUntil(context, '/', (r) => false);
+              AppData.performLogout(context);
             },
-            style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.indigo, foregroundColor: Colors.white),
-            child: const Text('Logout'),
+            style:
+                ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
+            child: const Text('Logout', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
@@ -71,7 +79,8 @@ class _StudentCheckStatusPageState extends State<StudentCheckStatusPage> {
 
   @override
   Widget build(BuildContext context) {
-    final booking = currentBooking;
+    // (UI left unchanged — keep your existing widget tree)
+    // Copy your original build method here (it was provided earlier).
     return Scaffold(
       backgroundColor: Colors.indigo[50],
       appBar: AppBar(
@@ -127,7 +136,7 @@ class _StudentCheckStatusPageState extends State<StudentCheckStatusPage> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    booking == null
+                    currentBooking == null
                         ? Container(
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
@@ -150,6 +159,7 @@ class _StudentCheckStatusPageState extends State<StudentCheckStatusPage> {
                             ),
                           )
                         : Container(
+                            // keep your existing booked card UI unchanged
                             padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
                               color: Colors.white,
@@ -165,6 +175,9 @@ class _StudentCheckStatusPageState extends State<StudentCheckStatusPage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
+                                // ... copy the same content you had earlier using currentBooking ...
+                                // (Use the code you already had, unchanged)
+                                // Example:
                                 Row(
                                   mainAxisAlignment:
                                       MainAxisAlignment.spaceBetween,
@@ -174,7 +187,7 @@ class _StudentCheckStatusPageState extends State<StudentCheckStatusPage> {
                                           color: Colors.indigo),
                                       const SizedBox(width: 6),
                                       Text(
-                                        booking['room'] ?? '',
+                                        currentBooking?['room'] ?? '',
                                         style: const TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 18),
@@ -185,7 +198,7 @@ class _StudentCheckStatusPageState extends State<StudentCheckStatusPage> {
                                           color: Colors.indigo, size: 20),
                                       const SizedBox(width: 6),
                                       Text(
-                                        booking['building'] ?? '',
+                                        currentBooking?['building'] ?? '',
                                         style: const TextStyle(fontSize: 16),
                                       ),
                                     ]),
@@ -200,7 +213,7 @@ class _StudentCheckStatusPageState extends State<StudentCheckStatusPage> {
                                         color: Colors.indigo, size: 20),
                                     const SizedBox(width: 8),
                                     Text(
-                                      'Time Slot: ${booking['timeslot'] ?? ''}',
+                                      'Time Slot: ${currentBooking?['timeslot'] ?? ''}',
                                       style: const TextStyle(fontSize: 16),
                                     ),
                                   ],
@@ -212,7 +225,7 @@ class _StudentCheckStatusPageState extends State<StudentCheckStatusPage> {
                                         color: Colors.indigo, size: 20),
                                     const SizedBox(width: 8),
                                     Text(
-                                      'Date: ${booking['date'] ?? ''}',
+                                      'Date: ${currentBooking?['date'] ?? ''}',
                                       style: const TextStyle(fontSize: 16),
                                     ),
                                   ],
@@ -224,7 +237,7 @@ class _StudentCheckStatusPageState extends State<StudentCheckStatusPage> {
                                         color: Colors.indigo, size: 20),
                                     const SizedBox(width: 8),
                                     Text(
-                                      'Booked at: ${booking['time'] ?? ''}',
+                                      'Booked at: ${currentBooking?['time'] ?? ''}',
                                       style: const TextStyle(fontSize: 16),
                                     ),
                                   ],
@@ -244,15 +257,13 @@ class _StudentCheckStatusPageState extends State<StudentCheckStatusPage> {
                                       padding: const EdgeInsets.symmetric(
                                           horizontal: 12, vertical: 6),
                                       decoration: BoxDecoration(
-                                        color:
-                                            (booking['status'] == 'Approved')
-                                                ? Colors.green
-                                                : Colors.amber,
-                                        borderRadius:
-                                            BorderRadius.circular(8),
+                                        color: (currentBooking?['status'] == 'Approved')
+                                            ? Colors.green
+                                            : Colors.amber,
+                                        borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(
-                                        booking['status'] ?? '',
+                                        currentBooking?['status'] ?? '',
                                         style: const TextStyle(
                                             color: Colors.white,
                                             fontWeight: FontWeight.bold),

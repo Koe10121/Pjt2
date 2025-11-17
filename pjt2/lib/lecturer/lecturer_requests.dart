@@ -1,3 +1,4 @@
+// lib/lecturer/lecturer_requests.dart
 import 'package:flutter/material.dart';
 import '../main.dart';
 import 'lecturer_home.dart';
@@ -41,13 +42,9 @@ class _LecturerRequestsPageState extends State<LecturerRequestsPage> {
                 borderRadius: BorderRadius.circular(10),
               ),
             ),
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(ctx);
-              AppData.lecturerAction(
-                idx,
-                isApprove ? 'Approved' : 'Rejected',
-                'Lecturer',
-              );
+              await AppData.lecturerAction(context, idx, isApprove ? 'Approved' : 'Rejected');
               setState(() {});
               widget.onRefresh();
 
@@ -111,6 +108,9 @@ class _LecturerRequestsPageState extends State<LecturerRequestsPage> {
     );
   }
 }
+
+// _RequestCard unchanged — copy your previous version here (keeps button visuals)
+
 
 class _RequestCard extends StatelessWidget {
   final String roomName, building, timeslot, date, time, requestedBy;

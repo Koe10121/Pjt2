@@ -1,7 +1,7 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:pjt2/student/student_home.dart';
-import 'package:pjt2/lecturer/lecturer_home.dart'; // ✅ add this (make sure path matches)
+import 'package:pjt2/lecturer/lecturer_home.dart'; // ✅ make sure import path matches
 import 'api_service.dart';
 
 class AppData {
@@ -17,6 +17,13 @@ class AppData {
   static String nowTime() {
     final now = DateTime.now();
     return "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+  }
+
+  // logout helper used across the app
+  static void performLogout(BuildContext context) {
+    ApiService.clearToken();
+    currentUser = null;
+    Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
   }
 
   // 🧾 (student) check if has booking today
@@ -47,25 +54,51 @@ class AppData {
   static List<Map<String, dynamic>> lecturerHistory = [];
 
   // this is the function your lecturer requests page was calling
-  static Future<void> lecturerAction(int idx, String status, String role) async {
+  // it now accepts BuildContext to allow logout handling
+  static Future<void> lecturerAction(BuildContext context, int idx, String status) async {
     if (idx < 0 || idx >= lecturerRequests.length) return;
 
     final req = lecturerRequests[idx];
     final bookingId = req['id'];
     final lecturerId = currentUser?['id'] ?? 0;
 
-    // this will call API -> /lecturer/approve or /lecturer/reject (we added in backend)
-    final result = await ApiService.lecturerAction(lecturerId, bookingId, status);
+    try {
+      final result = await ApiService.lecturerAction(lecturerId, bookingId, status);
+      if (result['ok'] == true) {
+        final record = {
+          ...req,
+          'status': status,
+          'actionTime': DateTime.now().toString().substring(11, 16),
+        };
 
-    if (result['ok'] == true) {
-      // move to history
-      final record = {
-        ...req,
-        'status': status,
-        'actionTime': DateTime.now().toString().substring(11, 16),
-      };
-      lecturerHistory.insert(0, record);
-      lecturerRequests.removeAt(idx);
+        try {
+          final roomName = req['room'];
+          final timeslot = req['timeslot'];
+          if (roomName != null && timeslot != null) {
+            final map = slotStatus[roomName];
+            if (map != null) {
+              if (status == 'Approved') {
+                map[timeslot] = 'Approved';
+              } else if (status == 'Rejected') {
+                map[timeslot] = 'Free';
+              }
+            }
+          }
+        } catch (e) {
+          print('Error updating slotStatus after lecturerAction: $e');
+        }
+
+        lecturerHistory.insert(0, record);
+        lecturerRequests.removeAt(idx);
+      } else {
+        // You can show the msg in UI (caller already shows snackbars)
+        print('lecturerAction response: ${result['msg']}');
+      }
+    } on UnauthorizedException {
+      // token invalid -> force logout
+      performLogout(context);
+    } catch (e) {
+      print('Error performing lecturerAction: $e');
     }
   }
 }
@@ -84,12 +117,12 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primarySwatch: Colors.indigo),
       home: const LoginPage(),
-      routes: {
-        '/register': (_) => const RegisterPage(),
-      },
+      routes: {'/register': (_) => const RegisterPage()},
     );
   }
 }
+
+
 
 // ------------------------------------------------------
 // LOGIN PAGE (same UI as yours)

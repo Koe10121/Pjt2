@@ -1,4 +1,4 @@
-
+// lib/student/student_history.dart
 import 'package:flutter/material.dart';
 import '../api_service.dart';
 import '../main.dart';
@@ -24,13 +24,20 @@ class _StudentHistoryPageState extends State<StudentHistoryPage> {
 
   Future<void> loadHistory() async {
     setState(() => loading = true);
-    final data = await ApiService.getBookings(widget.userId);
-    final filtered =
-        data.where((b) => (b['status'] == 'Approved' || b['status'] == 'Rejected')).toList();
-    setState(() {
-      history = filtered;
-      loading = false;
-    });
+    try {
+      final data = await ApiService.getBookings(widget.userId);
+      final filtered =
+          data.where((b) => (b['status'] == 'Approved' || b['status'] == 'Rejected')).toList();
+      setState(() {
+        history = filtered;
+        loading = false;
+      });
+    } on UnauthorizedException {
+      AppData.performLogout(context);
+    } catch (e) {
+      print('loadHistory error: $e');
+      setState(() => loading = false);
+    }
   }
 
   void logout(BuildContext context) {
@@ -44,7 +51,7 @@ class _StudentHistoryPageState extends State<StudentHistoryPage> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
-              Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+              AppData.performLogout(context);
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.indigo,
@@ -70,6 +77,7 @@ class _StudentHistoryPageState extends State<StudentHistoryPage> {
 
   @override
   Widget build(BuildContext context) {
+    // keep your UI unchanged - paste your existing build function here
     return Scaffold(
       backgroundColor: Colors.indigo[50],
       appBar: AppBar(
@@ -129,7 +137,7 @@ class _StudentHistoryPageState extends State<StudentHistoryPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // 🏢 Room name + building
+                              // ... your existing history item UI (unchanged) ...
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
@@ -155,12 +163,9 @@ class _StudentHistoryPageState extends State<StudentHistoryPage> {
                                   ]),
                                 ],
                               ),
-
                               const SizedBox(height: 12),
                               const Divider(),
                               const SizedBox(height: 10),
-
-                              // 🕒 Time slot
                               Row(children: [
                                 const Icon(Icons.access_time, color: Colors.indigo, size: 18),
                                 const SizedBox(width: 8),
@@ -169,10 +174,7 @@ class _StudentHistoryPageState extends State<StudentHistoryPage> {
                                   style: const TextStyle(fontSize: 15, color: Colors.black87),
                                 ),
                               ]),
-
                               const SizedBox(height: 8),
-
-                              // 📅 Date
                               Row(children: [
                                 const Icon(Icons.calendar_today, color: Colors.indigo, size: 18),
                                 const SizedBox(width: 8),
@@ -181,10 +183,7 @@ class _StudentHistoryPageState extends State<StudentHistoryPage> {
                                   style: const TextStyle(fontSize: 15, color: Colors.black87),
                                 ),
                               ]),
-
                               const SizedBox(height: 12),
-
-                              // 🧾 Status + Approved/Rejected By
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -217,18 +216,13 @@ class _StudentHistoryPageState extends State<StudentHistoryPage> {
                                       ),
                                     ],
                                   ),
-
-                                  // 👇 Rejected by / Approved by section
-                                  if (h['approved_by'] != null &&
-                                      h['approved_by'].toString().isNotEmpty)
+                                  if (h['approved_by'] != null && h['approved_by'].toString().isNotEmpty)
                                     Padding(
                                       padding: const EdgeInsets.only(left: 30.0, top: 4),
                                       child: Row(
                                         children: [
                                           Icon(
-                                            isApproved
-                                                ? Icons.verified_user
-                                                : Icons.block,
+                                            isApproved ? Icons.verified_user : Icons.block,
                                             color: isApproved ? Colors.green : Colors.red,
                                             size: 16,
                                           ),
