@@ -20,11 +20,12 @@ class AppData {
   }
 
   // logout helper used across the app
-  static void performLogout(BuildContext context) {
-    ApiService.clearToken();
-    currentUser = null;
-    Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
-  }
+ static void performLogout(BuildContext context) {
+  ApiService.clearAll();   // <-- FIXED
+  AppData.currentUser = null;
+  Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+}
+
 
   // 🧾 (student) check if has booking today
   static Future<bool> hasActiveBookingToday(int userId) async {
@@ -55,52 +56,51 @@ class AppData {
 
   // this is the function your lecturer requests page was calling
   // it now accepts BuildContext to allow logout handling
-  static Future<void> lecturerAction(BuildContext context, int idx, String status) async {
-    if (idx < 0 || idx >= lecturerRequests.length) return;
+ static Future<void> lecturerAction(
+    BuildContext context, int idx, String status) async {
+  if (idx < 0 || idx >= lecturerRequests.length) return;
 
-    final req = lecturerRequests[idx];
-    final bookingId = req['id'];
-    final lecturerId = currentUser?['id'] ?? 0;
+  final req = lecturerRequests[idx];
+  final bookingId = req['id'];
+  final lecturerId = currentUser?['id'] ?? 0;
 
-    try {
-      final result = await ApiService.lecturerAction(lecturerId, bookingId, status);
-      if (result['ok'] == true) {
-        final record = {
-          ...req,
-          'status': status,
-          'actionTime': DateTime.now().toString().substring(11, 16),
-        };
+  try {
+    final result = await ApiService.lecturerAction(
+      lecturerId,
+      bookingId,
+      status,
+    );
 
-        try {
-          final roomName = req['room'];
-          final timeslot = req['timeslot'];
-          if (roomName != null && timeslot != null) {
-            final map = slotStatus[roomName];
-            if (map != null) {
-              if (status == 'Approved') {
-                map[timeslot] = 'Approved';
-              } else if (status == 'Rejected') {
-                map[timeslot] = 'Free';
-              }
-            }
+    if (result['ok'] == true) {
+      // update slot
+      try {
+        final room = req['room'];
+        final slot = req['timeslot'];
+        if (room != null && slot != null) {
+          if (status == 'Approved') {
+            AppData.slotStatus[room]?[slot] = 'Approved';
+          } else {
+            AppData.slotStatus[room]?[slot] = 'Free';
           }
-        } catch (e) {
-          print('Error updating slotStatus after lecturerAction: $e');
         }
+      } catch (_) {}
 
-        lecturerHistory.insert(0, record);
-        lecturerRequests.removeAt(idx);
-      } else {
-        // You can show the msg in UI (caller already shows snackbars)
-        print('lecturerAction response: ${result['msg']}');
-      }
-    } on UnauthorizedException {
-      // token invalid -> force logout
-      performLogout(context);
-    } catch (e) {
-      print('Error performing lecturerAction: $e');
+      // add to history
+      lecturerHistory.insert(0, {
+        ...req,
+        "status": status,
+        "actionTime": DateTime.now().toString().substring(11, 16),
+      });
+
+      // remove from pending
+      lecturerRequests.removeAt(idx);
     }
+  } on UnauthorizedException {
+    performLogout(context);
+  } catch (e) {
+    print("lecturerAction error: $e");
   }
+}
 }
 
 void main() async {
