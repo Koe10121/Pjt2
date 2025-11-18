@@ -3,10 +3,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 class ApiService {
-  
-  static const base = 'http://192.168.1.105:3000';
+  static const base = 'http://192.168.190.1:3000';
 
- // 🧑‍🏫 Lecturer: get all pending requests
+  // 🧑‍🏫 Lecturer: get all pending requests
   static Future<List<dynamic>> getLecturerRequests() async {
     try {
       final res = await http.get(Uri.parse('$base/lecturer/requests'));
@@ -19,7 +18,11 @@ class ApiService {
   }
 
   // 🧑‍🏫 Lecturer: approve or reject booking
-  static Future<Map<String, dynamic>> lecturerAction(int lecturerId, int bookingId, String status) async {
+  static Future<Map<String, dynamic>> lecturerAction(
+    int lecturerId,
+    int bookingId,
+    String status,
+  ) async {
     try {
       final res = await http.post(
         Uri.parse('$base/lecturer/action'),
@@ -40,7 +43,9 @@ class ApiService {
   // 🧑‍🏫 Lecturer: get history
   static Future<List<dynamic>> getLecturerHistory(int lecturerId) async {
     try {
-      final res = await http.get(Uri.parse('$base/lecturer/history/$lecturerId'));
+      final res = await http.get(
+        Uri.parse('$base/lecturer/history/$lecturerId'),
+      );
       if (res.statusCode != 200) return [];
       return jsonDecode(res.body) as List<dynamic>;
     } catch (e) {
@@ -50,7 +55,10 @@ class ApiService {
   }
 
   // 🧍 LOGIN
-  static Future<Map<String, dynamic>?> login(String username, String password) async {
+  static Future<Map<String, dynamic>?> login(
+    String username,
+    String password,
+  ) async {
     try {
       final res = await http.post(
         Uri.parse('$base/login'),
@@ -84,6 +92,65 @@ class ApiService {
     }
   }
 
+  // --------------------------------------------------
+  // STAFF: room management
+  // --------------------------------------------------
+
+  // Add a new room (name + building).
+  static Future<Map<String, dynamic>> staffAddRoom(
+    String name,
+    String building,
+  ) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$base/staff/rooms'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'name': name, 'building': building}),
+      );
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (e) {
+      print('staffAddRoom error: $e');
+      return {'ok': false, 'msg': 'Network error'};
+    }
+  }
+
+  // Edit an existing room (by id).
+  static Future<Map<String, dynamic>> staffEditRoom(
+    int roomId,
+    String name,
+    String building,
+  ) async {
+    try {
+      final res = await http.put(
+        Uri.parse('$base/staff/rooms/$roomId'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'name': name, 'building': building}),
+      );
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (e) {
+      print('staffEditRoom error: $e');
+      return {'ok': false, 'msg': 'Network error'};
+    }
+  }
+
+  // Toggle room disabled flag.
+  static Future<Map<String, dynamic>> staffToggleRoomDisabled(
+    int roomId,
+    bool disabled,
+  ) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$base/staff/rooms/$roomId/toggle-disabled'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'disabled': disabled}),
+      );
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (e) {
+      print('staffToggleRoomDisabled error: $e');
+      return {'ok': false, 'msg': 'Network error'};
+    }
+  }
+
   // 🏠 Get all rooms
   static Future<List<dynamic>> getRooms() async {
     try {
@@ -109,12 +176,20 @@ class ApiService {
   }
 
   // 🧾 Book a room
-  static Future<Map<String, dynamic>> bookRoom(int userId, int roomId, String timeslot) async {
+  static Future<Map<String, dynamic>> bookRoom(
+    int userId,
+    int roomId,
+    String timeslot,
+  ) async {
     try {
       final res = await http.post(
         Uri.parse('$base/book'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'userId': userId, 'roomId': roomId, 'timeslot': timeslot}),
+        body: jsonEncode({
+          'userId': userId,
+          'roomId': roomId,
+          'timeslot': timeslot,
+        }),
       );
       return jsonDecode(res.body) as Map<String, dynamic>;
     } catch (e) {
@@ -135,6 +210,3 @@ class ApiService {
     }
   }
 }
-
-
-

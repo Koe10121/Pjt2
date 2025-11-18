@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:pjt2/student/student_home.dart';
 import 'package:pjt2/lecturer/lecturer_home.dart'; // ✅ add this (make sure path matches)
+import 'package:pjt2/staff/staff_home.dart';
 import 'api_service.dart';
 
 class AppData {
@@ -18,6 +19,10 @@ class AppData {
     final now = DateTime.now();
     return "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
   }
+
+  // --------------------------------------------------
+  // SHARED ROOM STATE (lecturer + staff)
+  // --------------------------------------------------
 
   // 🧾 (student) check if has booking today
   static Future<bool> hasActiveBookingToday(int userId) async {
@@ -39,6 +44,8 @@ class AppData {
   static Map<String, Map<String, String>> slotStatus = {};
   // room -> building
   static Map<String, String> roomBuildings = {};
+  // room name -> database id (for staff edits)
+  static Map<String, int> roomIds = {};
 
   // pending requests that lecturer can approve/reject
   static List<Map<String, dynamic>> lecturerRequests = [];
@@ -66,6 +73,99 @@ class AppData {
       };
       lecturerHistory.insert(0, record);
       lecturerRequests.removeAt(idx);
+    }
+  }
+
+  // --------------------------------------------------
+  // STAFF: in-memory room management helpers
+  // (UI already validates rules such as
+  //  "can only disable if all slots are Free")
+  // --------------------------------------------------
+
+  /// Add a new room with all slots Free.
+  static void staffAddRoom(String name, String building) {
+    if (name.isEmpty) return;
+
+    // If room already exists, just update building.
+    if (slotStatus.containsKey(name)) {
+      roomBuildings[name] = building;
+      return;
+    }
+
+    slotStatus[name] = {
+      '8-10': 'Free',
+      '10-12': 'Free',
+      '13-15': 'Free',
+      '15-17': 'Free',
+    };
+    roomBuildings[name] = building;
+
+    // Try to persist to backend (fire-and-forget).
+    ApiService.staffAddRoom(name, building).then((res) {
+      if (res['ok'] == true && res['room'] != null) {
+        final room = Map<String, dynamic>.from(res['room']);
+        final id = room['id'];
+        if (id is int) {
+          roomIds[name] = id;
+        }
+      }
+    });
+  }
+
+  /// Edit an existing room's name / building.
+  static void staffEditRoom(
+      String oldName, String newName, String newBuilding) {
+    final roomId = roomIds[oldName];
+
+    if (!slotStatus.containsKey(oldName)) return;
+
+    // If name didn't change, just update building.
+    if (oldName == newName) {
+      roomBuildings[newName] = newBuilding;
+      return;
+    }
+
+    final map = slotStatus.remove(oldName);
+    if (map == null) return;
+
+    slotStatus[newName] = map;
+
+    // Move building mapping.
+    final oldBuilding = roomBuildings.remove(oldName);
+    roomBuildings[newName] =
+        newBuilding.isNotEmpty ? newBuilding : (oldBuilding ?? '');
+
+    // Move any cached room id if present.
+    final id = roomIds.remove(oldName);
+    if (id != null) {
+      roomIds[newName] = id;
+    }
+
+    // Persist to backend when we know the id.
+    if (roomId != null) {
+      ApiService.staffEditRoom(roomId, newName, newBuilding);
+    }
+  }
+
+  /// Toggle whether a room is disabled.
+  ///
+  /// `disable` = true  => all slots become "Disabled".
+  /// `disable` = false => all slots reset to "Free".
+  /// Caller (UI) already checked that only all-Free
+  /// rooms can be disabled.
+  static void staffToggleRoomDisabled(String name, bool disable) {
+    final map = slotStatus[name];
+    if (map == null) return;
+
+    if (disable) {
+      map.updateAll((key, value) => 'Disabled');
+    } else {
+      map.updateAll((key, value) => 'Free');
+    }
+
+    final roomId = roomIds[name];
+    if (roomId != null) {
+      ApiService.staffToggleRoomDisabled(roomId, disable);
     }
   }
 }
@@ -144,6 +244,13 @@ class _LoginPageState extends State<LoginPage> {
         context,
         MaterialPageRoute(
           builder: (_) => const LecturerHomePage(),
+        ),
+      );
+    } else if (user['role'] == 'staff') {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (_) => const StaffHomePage(),
         ),
       );
     } else {

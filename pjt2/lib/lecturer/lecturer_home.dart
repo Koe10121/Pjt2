@@ -31,14 +31,18 @@ class _LecturerHomePageState extends State<LecturerHomePage> {
   final rooms = await ApiService.getRooms();
   AppData.slotStatus.clear();
   AppData.roomBuildings.clear();
+  AppData.roomIds.clear();
   for (var room in rooms) {
-    AppData.slotStatus[room['name']] = {
+    final name = room['name'] as String;
+    final id = room['id'] as int;
+    AppData.slotStatus[name] = {
       '8-10': 'Free',
       '10-12': 'Free',
       '13-15': 'Free',
       '15-17': 'Free',
     };
-    AppData.roomBuildings[room['name']] = room['building'];
+    AppData.roomBuildings[name] = room['building'] as String;
+    AppData.roomIds[name] = id;
   }
 
   // 2️⃣ Load today's room statuses
