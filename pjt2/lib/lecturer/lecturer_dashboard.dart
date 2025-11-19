@@ -8,9 +8,22 @@ class LecturerDashboardPage extends StatelessWidget {
 
   int countFree() {
     int c = 0;
+    final now = AppData.nowTime();
+
+    bool isTimePassed(String slotRange) {
+      final parts = slotRange.split('-').map((e) => int.parse(e)).toList();
+      final endHour = parts[1];
+
+      final curParts = now.split(":").map(int.parse).toList();
+      final currentTotal = curParts[0] * 60 + curParts[1];
+      final endTotal = endHour * 60;
+
+      return currentTotal >= (endTotal - 30);
+    }
+
     AppData.slotStatus.forEach((_, map) {
-      map.forEach((_, status) {
-        if (status == 'Free') c++;
+      map.forEach((slotRange, status) {
+        if (status == 'Free' && !isTimePassed(slotRange)) c++;
       });
     });
     return c;
@@ -37,13 +50,14 @@ class LecturerDashboardPage extends StatelessWidget {
   }
 
   int countDisabled() {
-    int c = 0;
+    // Count disabled rooms (all slots Disabled),
+    // matching the "Disabled Rooms" card label.
+    int roomsDisabled = 0;
     AppData.slotStatus.forEach((_, map) {
-      map.forEach((_, status) {
-        if (status == 'Disabled') c++;
-      });
+      final allDisabled = map.values.every((status) => status == 'Disabled');
+      if (allDisabled) roomsDisabled++;
     });
-    return c;
+    return roomsDisabled;
   }
 
   @override

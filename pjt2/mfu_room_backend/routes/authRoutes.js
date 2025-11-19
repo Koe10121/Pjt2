@@ -27,8 +27,31 @@ router.post("/login", (req, res) => {
     }
 
     delete user.password;
+
+    // Set session
+    req.session.user = user;
+
     return res.json({ user, msg: "Login successful." });
   });
+});
+
+// ---------------- LOGOUT ----------------
+router.post("/logout", (req, res) => {
+  req.session.destroy(err => {
+    if (err) {
+      return res.status(500).json({ ok: false, msg: "Logout failed." });
+    }
+    res.clearCookie("session_cookie_name");
+    return res.json({ ok: true, msg: "Logout successful." });
+  });
+});
+
+// ---------------- CHECK SESSION ----------------
+router.get("/me", (req, res) => {
+  if (req.session.user) {
+    return res.json({ ok: true, user: req.session.user });
+  }
+  return res.json({ ok: false, user: null });
 });
 
 // ---------------- REGISTER ----------------

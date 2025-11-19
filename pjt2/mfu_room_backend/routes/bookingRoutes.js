@@ -1,7 +1,11 @@
 import express from "express";
 import db from "../config/db.js";
+import { isAuthenticated } from "../middleware/authMiddleware.js";
 
 const router = express.Router();
+
+// Apply middleware to all routes in this file
+router.use(isAuthenticated);
 
 // ---------------- BOOKINGS ----------------
 router.get("/bookings/:userId", (req, res) => {

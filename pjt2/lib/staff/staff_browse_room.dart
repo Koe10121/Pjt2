@@ -144,11 +144,15 @@ class RoomCard extends StatelessWidget {
   });
 
   Color colorFor(String status, String slotRange) {
-    if (status == 'Reserved') return Colors.red;
+    // Backend uses "Approved" for confirmed bookings;
+    // treat it the same as "Reserved" in the UI.
+    if (status == 'Reserved' || status == 'Approved') return Colors.red;
     if (status == 'Pending') return Colors.amber;
     if (status == 'Disabled') return Colors.grey;
-    if (isTimePassed(slotRange, now)) return Colors.grey;
-    return Colors.green;
+    if (status == 'Free') {
+      return isTimePassed(slotRange, now) ? Colors.grey : Colors.green;
+    }
+    return Colors.grey;
   }
 
   @override

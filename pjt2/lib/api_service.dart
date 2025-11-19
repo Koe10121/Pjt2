@@ -1,14 +1,28 @@
 // lib/api_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:http/browser_client.dart'; // Required for Web Cookies
 
 class ApiService {
-  static const base = 'http://192.168.190.1:3000';
+  // Use localhost for local development to ensure cookies work correctly
+  static const base = 'http://localhost:3000';
+
+  // Create a single client instance
+  static final http.Client _client = _createClient();
+
+  // Configure client to send cookies (credentials)
+  static http.Client _createClient() {
+    final client = http.Client();
+    if (client is BrowserClient) {
+      client.withCredentials = true;
+    }
+    return client;
+  }
 
   // 🧑‍🏫 Lecturer: get all pending requests
   static Future<List<dynamic>> getLecturerRequests() async {
     try {
-      final res = await http.get(Uri.parse('$base/lecturer/requests'));
+      final res = await _client.get(Uri.parse('$base/lecturer/requests'));
       if (res.statusCode != 200) return [];
       return jsonDecode(res.body) as List<dynamic>;
     } catch (e) {
@@ -24,7 +38,7 @@ class ApiService {
     String status,
   ) async {
     try {
-      final res = await http.post(
+      final res = await _client.post(
         Uri.parse('$base/lecturer/action'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -43,7 +57,7 @@ class ApiService {
   // 🧑‍🏫 Lecturer: get history
   static Future<List<dynamic>> getLecturerHistory(int lecturerId) async {
     try {
-      final res = await http.get(
+      final res = await _client.get(
         Uri.parse('$base/lecturer/history/$lecturerId'),
       );
       if (res.statusCode != 200) return [];
@@ -60,7 +74,7 @@ class ApiService {
     String password,
   ) async {
     try {
-      final res = await http.post(
+      final res = await _client.post(
         Uri.parse('$base/login'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'username': username, 'password': password}),
@@ -78,7 +92,7 @@ class ApiService {
   // 📝 REGISTER (student only)
   static Future<bool> register(String username, String password) async {
     try {
-      final res = await http.post(
+      final res = await _client.post(
         Uri.parse('$base/register'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'username': username, 'password': password}),
@@ -102,7 +116,7 @@ class ApiService {
     String building,
   ) async {
     try {
-      final res = await http.post(
+      final res = await _client.post(
         Uri.parse('$base/staff/rooms'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'name': name, 'building': building}),
@@ -121,7 +135,7 @@ class ApiService {
     String building,
   ) async {
     try {
-      final res = await http.put(
+      final res = await _client.put(
         Uri.parse('$base/staff/rooms/$roomId'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'name': name, 'building': building}),
@@ -139,7 +153,7 @@ class ApiService {
     bool disabled,
   ) async {
     try {
-      final res = await http.post(
+      final res = await _client.post(
         Uri.parse('$base/staff/rooms/$roomId/toggle-disabled'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'disabled': disabled}),
@@ -154,7 +168,7 @@ class ApiService {
   // 🏠 Get all rooms
   static Future<List<dynamic>> getRooms() async {
     try {
-      final res = await http.get(Uri.parse('$base/rooms'));
+      final res = await _client.get(Uri.parse('$base/rooms'));
       if (res.statusCode != 200) return [];
       return jsonDecode(res.body) as List<dynamic>;
     } catch (e) {
@@ -166,7 +180,7 @@ class ApiService {
   // 📖 Get all bookings for a specific user
   static Future<List<dynamic>> getBookings(int userId) async {
     try {
-      final res = await http.get(Uri.parse('$base/bookings/$userId'));
+      final res = await _client.get(Uri.parse('$base/bookings/$userId'));
       if (res.statusCode != 200) return [];
       return jsonDecode(res.body) as List<dynamic>;
     } catch (e) {
@@ -182,7 +196,7 @@ class ApiService {
     String timeslot,
   ) async {
     try {
-      final res = await http.post(
+      final res = await _client.post(
         Uri.parse('$base/book'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
@@ -201,7 +215,7 @@ class ApiService {
   // 🕒 NEW: Get room statuses (for showing Pending / Approved / Free)
   static Future<Map<String, dynamic>> getRoomStatuses(String date) async {
     try {
-      final res = await http.get(Uri.parse('$base/room-statuses/$date'));
+      final res = await _client.get(Uri.parse('$base/room-statuses/$date'));
       if (res.statusCode != 200) return {};
       return jsonDecode(res.body) as Map<String, dynamic>;
     } catch (e) {
