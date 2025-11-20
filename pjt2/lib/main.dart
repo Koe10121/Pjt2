@@ -10,12 +10,16 @@ class AppData {
 
   static String get todayDate {
     final now = DateTime.now();
-    return "${now.year.toString().padLeft(4, '0')}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}";
+    final utc = now.toUtc();
+    final thailand = utc.add(const Duration(hours: 7));
+    return "${thailand.year.toString().padLeft(4, '0')}-${thailand.month.toString().padLeft(2, '0')}-${thailand.day.toString().padLeft(2, '0')}";
   }
 
   static String nowTime() {
     final now = DateTime.now();
-    return "${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}";
+    final utc = now.toUtc();
+    final thailand = utc.add(const Duration(hours: 7));
+    return "${thailand.hour.toString().padLeft(2, '0')}:${thailand.minute.toString().padLeft(2, '0')}";
   }
 
   // logout helper used across the app (fixed: does not rely on '/' route)
@@ -74,27 +78,25 @@ class AppData {
       }
     }
 
-    final statuses = await ApiService.getRoomStatuses(AppData.todayDate);
+    final statuses = await ApiService.getRoomStatuses('today');
     try {
-      if (statuses is Map) {
-        statuses.forEach((roomId, data) {
-          if (data is Map && data['room_name'] != null && data['slots'] != null) {
-            final rname = data['room_name'];
-            final m = slotStatus[rname];
-            if (m != null) {
-              final disabled = data['disabled'] == 1;
-              if (disabled) {
-                m.updateAll((key, value) => 'Disabled');
-              } else {
-                final slots = Map<String, dynamic>.from(data['slots']);
-                slots.forEach((slot, status) {
-                  m[slot] = status ?? 'Free';
-                });
-              }
+      statuses.forEach((roomId, data) {
+        if (data is Map && data['room_name'] != null && data['slots'] != null) {
+          final rname = data['room_name'];
+          final m = slotStatus[rname];
+          if (m != null) {
+            final disabled = data['disabled'] == 1;
+            if (disabled) {
+              m.updateAll((key, value) => 'Disabled');
+            } else {
+              final slots = Map<String, dynamic>.from(data['slots']);
+              slots.forEach((slot, status) {
+                m[slot] = status ?? 'Free';
+              });
             }
           }
-        });
-      }
+        }
+      });
     } catch (e) {
       print("loadRoomData status merge error: $e");
     }

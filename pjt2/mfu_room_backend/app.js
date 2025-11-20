@@ -165,7 +165,7 @@ app.get("/bookings/:userId", verifyTokenMiddleware, (req, res) => {
 app.post("/book", verifyTokenMiddleware, (req, res) => {
   const tokenUser = req.tokenUser; // { id, role }
   const { userId, roomId, timeslot } = req.body;
-  const date = new Date().toISOString().slice(0, 10);
+  // use server-side CURDATE() for date comparisons and insertion to avoid timezone mismatches
 
   if (!userId || !roomId || !timeslot) {
     return res.json({ ok: false, msg: "Missing userId, roomId, or timeslot." });
@@ -203,29 +203,29 @@ app.post("/book", verifyTokenMiddleware, (req, res) => {
 
     const checkSql = `
       SELECT * FROM bookings
-      WHERE user_id = ? AND date = ?
+      WHERE user_id = ? AND DATE(date) = CURDATE()
       AND (status = 'Pending' OR status = 'Approved')
     `;
-    db.query(checkSql, [uid, date], (err, existing) => {
+    db.query(checkSql, [uid], (err, existing) => {
       if (err) return res.json({ ok: false, msg: "Database error." });
       if (existing.length > 0)
         return res.json({ ok: false, msg: "You already have an active booking today." });
 
       const slotSql = `
         SELECT * FROM bookings
-        WHERE room_id = ? AND timeslot = ? AND date = ?
+        WHERE room_id = ? AND timeslot = ? AND DATE(date) = CURDATE()
         AND (status = 'Pending' OR status = 'Approved')
       `;
-      db.query(slotSql, [roomId, timeslot, date], (err, slot) => {
+      db.query(slotSql, [roomId, timeslot], (err, slot) => {
         if (err) return res.json({ ok: false, msg: "Database error." });
         if (slot.length > 0)
           return res.json({ ok: false, msg: "This time slot is not available." });
 
         const insertSql = `
           INSERT INTO bookings (user_id, room_id, timeslot, date, time, status)
-          VALUES (?, ?, ?, ?, CURTIME(), 'Pending')
+          VALUES (?, ?, ?, CURDATE(), CURTIME(), 'Pending')
         `;
-        db.query(insertSql, [uid, roomId, timeslot, date], (err) => {
+        db.query(insertSql, [uid, roomId, timeslot], (err) => {
           if (err) return res.json({ ok: false, msg: "Insert failed." });
           res.json({ ok: true, msg: "Booking request sent!" });
         });
@@ -237,6 +237,52 @@ app.post("/book", verifyTokenMiddleware, (req, res) => {
 // ---------------- ROOM STATUSES (FOR A GIVEN DATE) (authenticated)
 app.get("/room-statuses/:date", verifyTokenMiddleware, (req, res) => {
   const date = req.params.date;
+  // If client passes 'today', use server-side CURDATE() to avoid timezone mismatches
+  if (date === 'today') {
+    const sql = `
+      SELECT 
+        r.id AS room_id, r.name AS room_name, r.building, r.is_disabled,
+        b.timeslot, b.status
+      FROM rooms r
+      LEFT JOIN bookings b ON r.id = b.room_id AND DATE(b.date) = CURDATE()
+      ORDER BY r.id
+    `;
+    db.query(sql, (err, rows) => {
+      if (err) return res.status(500).json({ error: "db_error", msg: "Database error fetching statuses." });
+
+      const map = {};
+      rows.forEach(row => {
+        const rid = row.room_id;
+        if (!map[rid]) {
+          map[rid] = {
+            room_name: row.room_name,
+            building: row.building,
+            disabled: row.is_disabled ? 1 : 0,
+            slots: { "8-10": "Free", "10-12": "Free", "13-15": "Free", "15-17": "Free" }
+          };
+        }
+        if (row.is_disabled === 1) {
+          map[rid].slots = {
+            "8-10": "Disabled",
+            "10-12": "Disabled",
+            "13-15": "Disabled",
+            "15-17": "Disabled"
+          };
+        } else if (row.timeslot) {
+          if (row.status === "Approved") {
+            map[rid].slots[row.timeslot] = "Approved";
+          } else if (row.status === "Pending") {
+            map[rid].slots[row.timeslot] = "Pending";
+          } else {
+            map[rid].slots[row.timeslot] = "Free";
+          }
+        }
+      });
+      res.json(map);
+    });
+    return;
+  }
+
   const sql = `
     SELECT 
       r.id AS room_id, r.name AS room_name, r.building, r.is_disabled,

@@ -44,7 +44,7 @@ class _BrowseRoomPageState extends State<BrowseRoomPage> {
     setState(() => loading = true);
     try {
       final r = await ApiService.getRooms();
-      final statuses = await ApiService.getRoomStatuses(todayDate);
+      final statuses = await ApiService.getRoomStatuses('today');
 
       final Map<String, Map<String, String>> parsedStatuses = {};
       statuses.forEach((id, data) {

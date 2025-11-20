@@ -42,7 +42,7 @@ class _LecturerHomePageState extends State<LecturerHomePage> {
       }
 
       // 2️⃣ Load today's room statuses
-      final statuses = await ApiService.getRoomStatuses(AppData.todayDate);
+      final statuses = await ApiService.getRoomStatuses('today');
       statuses.forEach((roomId, map) {
         if (map is Map && map['room_name'] != null && map['slots'] != null) {
           final rname = map['room_name'];

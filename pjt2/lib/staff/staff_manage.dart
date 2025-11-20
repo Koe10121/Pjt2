@@ -81,13 +81,14 @@ class _StaffManagePageState extends State<StaffManagePage> {
               if (!newBuilding.toLowerCase().startsWith('building ')) newBuilding = 'Building $newBuilding';
 
               final currentBuilding = AppData.roomBuildings[oldName] ?? '';
-              final ok = await AppData.staffEditRoom(oldName, currentBuilding, newName, newBuilding);
+              final resp = await AppData.staffEditRoom(oldName, currentBuilding, newName, newBuilding);
               Navigator.pop(ctx);
-              if (ok == true) {
+              final ok = resp['ok'] == true;
+              final msg = resp['msg'] ?? (ok ? 'Room updated' : 'Failed to update room');
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+              if (ok) {
                 widget.onChange();
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Room updated successfully')));
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to update room')));
+                setState(() {});
               }
             },
             child: const Text('Save', style: TextStyle(color: Colors.white)),
@@ -109,7 +110,17 @@ class _StaffManagePageState extends State<StaffManagePage> {
         backgroundColor: Colors.indigo[600],
         foregroundColor: Colors.white,
         centerTitle: true,
-        actions: [IconButton(icon: const Icon(Icons.logout), onPressed: widget.onLogout)],
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () async {
+              await AppData.loadRoomData();
+              widget.onChange();
+              setState(() {});
+            },
+          ),
+          IconButton(icon: const Icon(Icons.logout), onPressed: widget.onLogout),
+        ],
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),

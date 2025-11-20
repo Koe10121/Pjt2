@@ -50,6 +50,13 @@ class _StaffBrowseRoomPageState extends State<StaffBrowseRoomPage> {
         centerTitle: true,
         actions: [
           IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () async {
+              await AppData.loadRoomData();
+              setState(() {});
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.logout),
             onPressed: widget.onLogout,
           )
