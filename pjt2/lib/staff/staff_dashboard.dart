@@ -22,6 +22,15 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
     return c;
   }
 
+  int countDisabledRooms() {
+    int c = 0;
+    AppData.slotStatus.forEach((_, map) {
+      // if any slot for this room is marked Disabled, count the room once
+      if (map.values.any((v) => v == 'Disabled')) c++;
+    });
+    return c;
+  }
+
   Future<void> _refreshOverview() async {
     setState(() => loading = true);
     try {
@@ -43,7 +52,7 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
     final free = countStatus("Free");
     final pending = countStatus("Pending");
     final approved = countStatus("Approved");
-    final disabled = countStatus("Disabled");
+    final disabled = countDisabledRooms();
 
     return Scaffold(
       backgroundColor: Colors.indigo[50],

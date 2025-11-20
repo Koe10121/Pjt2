@@ -39,9 +39,7 @@ int countReserved() {   // NOW SHOWS APPROVED ONLY
 int countDisabled() {
   int c = 0;
   AppData.slotStatus.forEach((_, map) {
-    map.forEach((_, status) {
-      if (status == 'Disabled') c++;
-    });
+    if (map.values.any((v) => v == 'Disabled')) c++;
   });
   return c;
 }
