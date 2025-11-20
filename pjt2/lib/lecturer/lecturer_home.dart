@@ -24,53 +24,58 @@ class _LecturerHomePageState extends State<LecturerHomePage> {
     _loadAllData();
   }
 
- Future<void> _loadAllData() async {
-  setState(() => loading = true);
-
-  // 1️⃣ Load rooms
-  final rooms = await ApiService.getRooms();
-  AppData.slotStatus.clear();
-  AppData.roomBuildings.clear();
-  for (var room in rooms) {
-    AppData.slotStatus[room['name']] = {
-      '8-10': 'Free',
-      '10-12': 'Free',
-      '13-15': 'Free',
-      '15-17': 'Free',
-    };
-    AppData.roomBuildings[room['name']] = room['building'];
-  }
-
-  // 2️⃣ Load today's room statuses
-  final statuses = await ApiService.getRoomStatuses(AppData.todayDate);
-  statuses.forEach((roomId, map) {
-    if (map is Map && map['room_name'] != null && map['slots'] != null) {
-      final rname = map['room_name'];
-      final m = AppData.slotStatus[rname];
-      if (m != null) {
-        final disabled = map['disabled'] == 1;
-        if (disabled) {
-          m.updateAll((key, value) => 'Disabled');
-        } else {
-          final slots = Map<String, dynamic>.from(map['slots']);
-          slots.forEach((slot, status) {
-            m[slot] = status ?? 'Free';
-          });
-        }
+  Future<void> _loadAllData() async {
+    setState(() => loading = true);
+    try {
+      // 1️⃣ Load rooms
+      final rooms = await ApiService.getRooms();
+      AppData.slotStatus.clear();
+      AppData.roomBuildings.clear();
+      for (var room in rooms) {
+        AppData.slotStatus[room['name']] = {
+          '8-10': 'Free',
+          '10-12': 'Free',
+          '13-15': 'Free',
+          '15-17': 'Free',
+        };
+        AppData.roomBuildings[room['name']] = room['building'];
       }
+
+      // 2️⃣ Load today's room statuses
+      final statuses = await ApiService.getRoomStatuses('today');
+      statuses.forEach((roomId, map) {
+        if (map is Map && map['room_name'] != null && map['slots'] != null) {
+          final rname = map['room_name'];
+          final m = AppData.slotStatus[rname];
+          if (m != null) {
+            final disabled = map['disabled'] == 1;
+            if (disabled) {
+              m.updateAll((key, value) => 'Disabled');
+            } else {
+              final slots = Map<String, dynamic>.from(map['slots']);
+              slots.forEach((slot, status) {
+                m[slot] = status ?? 'Free';
+              });
+            }
+          }
+        }
+      });
+
+      // 3️⃣ Load lecturer requests (today only) + history
+      AppData.lecturerRequests =
+          List<Map<String, dynamic>>.from(await ApiService.getLecturerRequests());
+      final id = AppData.currentUser?['id'] ?? 0;
+      AppData.lecturerHistory =
+          List<Map<String, dynamic>>.from(await ApiService.getLecturerHistory(id));
+    } on UnauthorizedException {
+      AppData.performLogout(context);
+      return;
+    } catch (e) {
+      print('_loadAllData error: $e');
+    } finally {
+      if (mounted) setState(() => loading = false);
     }
-  });
-
-  // 3️⃣ Load lecturer requests (today only) + history
-  AppData.lecturerRequests =
-      List<Map<String, dynamic>>.from(await ApiService.getLecturerRequests());
-  final id = AppData.currentUser?['id'] ?? 0;
-  AppData.lecturerHistory =
-      List<Map<String, dynamic>>.from(await ApiService.getLecturerHistory(id));
-
-  setState(() => loading = false);
-}
-
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -180,7 +185,7 @@ class _LecturerHomePageState extends State<LecturerHomePage> {
             ),
             onPressed: () {
               Navigator.pop(ctx);
-              Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+              AppData.performLogout(context);
             },
             child: const Text('Logout',
                 style:

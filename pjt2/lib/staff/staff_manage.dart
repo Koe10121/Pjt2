@@ -1,5 +1,3 @@
-
-
 import 'package:flutter/material.dart';
 import '../main.dart';
 
@@ -15,7 +13,6 @@ class StaffManagePage extends StatefulWidget {
 class _StaffManagePageState extends State<StaffManagePage> {
   final TextEditingController _searchCtrl = TextEditingController();
 
-  // ---------------- Add Room Dialog ----------------
   void _showAddDialog() {
     final nameCtrl = TextEditingController();
     final buildingCtrl = TextEditingController();
@@ -24,106 +21,75 @@ class _StaffManagePageState extends State<StaffManagePage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Add Room'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(hintText: 'Room name (e.g., A101)'),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: buildingCtrl,
-              decoration: const InputDecoration(hintText: 'Building (e.g., 3 or B)'),
-            ),
-          ],
-        ),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(controller: nameCtrl, decoration: const InputDecoration(hintText: 'Room name (e.g., A101)')),
+          const SizedBox(height: 8),
+          TextField(controller: buildingCtrl, decoration: const InputDecoration(hintText: 'Building (e.g., 3 or B)')),
+        ]),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
+              ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
-            onPressed: () {
+            onPressed: () async {
               String name = nameCtrl.text.trim();
               String building = buildingCtrl.text.trim();
-
               if (name.isEmpty || building.isEmpty) {
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(const SnackBar(content: Text('Fill both fields')));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fill both fields')));
                 return;
               }
-
-              // ✅ Normalize names
               if (!name.toLowerCase().startsWith('room ')) name = 'Room $name';
               if (!building.toLowerCase().startsWith('building ')) building = 'Building $building';
 
-              setState(() {
-                AppData.staffAddRoom(name, building);
-              });
-              widget.onChange();
+              final resp = await AppData.staffAddRoom(name, building);
               Navigator.pop(ctx);
+              widget.onChange();
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(resp['msg'] ?? (resp['ok'] == true ? 'Room added' : 'Failed'))));
             },
-            child: const Text(' Add Room', style: TextStyle(color: Colors.white)),
+            child: const Text('Add Room', style: TextStyle(color: Colors.white)),
           ),
         ],
       ),
     );
   }
 
-  // ---------------- Edit Room Dialog ----------------
   void _showEditDialog(String oldName) {
     final currentBuilding = AppData.roomBuildings[oldName] ?? '';
-
-    // ✅ Use caseSensitive: false instead of (?i)
-    final nameCtrl = TextEditingController(
-      text: oldName.replaceFirst(RegExp(r'^room\s*', caseSensitive: false), ''),
-    );
-    final buildingCtrl = TextEditingController(
-      text: currentBuilding.replaceFirst(RegExp(r'^building\s*', caseSensitive: false), ''),
-    );
+    final nameCtrl = TextEditingController(text: oldName.replaceFirst(RegExp(r'^room\s*', caseSensitive: false), ''));
+    final buildingCtrl = TextEditingController(text: currentBuilding.replaceFirst(RegExp(r'^building\s*', caseSensitive: false), ''));
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Edit Room'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-                controller: nameCtrl,
-                decoration: const InputDecoration(hintText: 'Room name (e.g., A101)')),
-            const SizedBox(height: 8),
-            TextField(
-                controller: buildingCtrl,
-                decoration: const InputDecoration(hintText: 'Building (e.g., 3 or B)')),
-          ],
-        ),
+        content: Column(mainAxisSize: MainAxisSize.min, children: [
+          TextField(controller: nameCtrl, decoration: const InputDecoration(hintText: 'Room name (e.g., A101)')),
+          const SizedBox(height: 8),
+          TextField(controller: buildingCtrl, decoration: const InputDecoration(hintText: 'Building (e.g., 3 or B)')),
+        ]),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
-            onPressed: () {
+            onPressed: () async {
               String newName = nameCtrl.text.trim();
               String newBuilding = buildingCtrl.text.trim();
-
               if (newName.isEmpty || newBuilding.isEmpty) {
-                ScaffoldMessenger.of(context)
-                    .showSnackBar(const SnackBar(content: Text('Fill both fields')));
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fill both fields')));
                 return;
               }
-
-              // ✅ Normalize input
               if (!newName.toLowerCase().startsWith('room ')) newName = 'Room $newName';
-              if (!newBuilding.toLowerCase().startsWith('building '))
-                newBuilding = 'Building $newBuilding';
+              if (!newBuilding.toLowerCase().startsWith('building ')) newBuilding = 'Building $newBuilding';
 
-              setState(() {
-                AppData.staffEditRoom(oldName, newName, newBuilding);
-              });
-
-              widget.onChange();
+              final currentBuilding = AppData.roomBuildings[oldName] ?? '';
+              final resp = await AppData.staffEditRoom(oldName, currentBuilding, newName, newBuilding);
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context)
-                  .showSnackBar(const SnackBar(content: Text('Room updated successfully')));
+              final ok = resp['ok'] == true;
+              final msg = resp['msg'] ?? (ok ? 'Room updated' : 'Failed to update room');
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+              if (ok) {
+                widget.onChange();
+                setState(() {});
+              }
             },
             child: const Text('Save', style: TextStyle(color: Colors.white)),
           ),
@@ -132,19 +98,27 @@ class _StaffManagePageState extends State<StaffManagePage> {
     );
   }
 
-  // ---------------- Main UI ----------------
   @override
   Widget build(BuildContext context) {
     final rooms = AppData.slotStatus.keys.toList()..sort();
-    final filtered =
-        rooms.where((r) => r.toLowerCase().contains(_searchCtrl.text.toLowerCase())).toList();
+    final filtered = rooms.where((r) => r.toLowerCase().contains(_searchCtrl.text.toLowerCase())).toList();
 
     return Scaffold(
+      backgroundColor: Colors.indigo[50],
       appBar: AppBar(
-        title: const Text("Staff - Manage Rooms"),
-        backgroundColor: Colors.white,
-        elevation: 1,
+        title: const Text("Manage Rooms"),
+        backgroundColor: Colors.indigo[600],
+        foregroundColor: Colors.white,
+        centerTitle: true,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: () async {
+              await AppData.loadRoomData();
+              widget.onChange();
+              setState(() {});
+            },
+          ),
           IconButton(icon: const Icon(Icons.logout), onPressed: widget.onLogout),
         ],
       ),
@@ -154,28 +128,20 @@ class _StaffManagePageState extends State<StaffManagePage> {
           TextField(
             controller: _searchCtrl,
             onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
-              prefixIcon: const Icon(Icons.search),
-              hintText: "Search rooms (e.g., A101, B204)",
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-            ),
+            decoration: InputDecoration(prefixIcon: const Icon(Icons.search), hintText: "Search rooms (e.g., A101, B204)", border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), filled: true, fillColor: Colors.white),
           ),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
-            height: 50,
+            height: 48,
             child: ElevatedButton.icon(
               onPressed: _showAddDialog,
               icon: const Icon(Icons.add, color: Colors.white),
-              label: const Text(" Add Room",
-                  style: TextStyle(color: Colors.white, fontSize: 16)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.indigo,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
+              label: const Text("Add Room", style: TextStyle(color: Colors.white, fontSize: 16)),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           Expanded(
             child: ListView.separated(
               itemCount: filtered.length,
@@ -183,61 +149,50 @@ class _StaffManagePageState extends State<StaffManagePage> {
               itemBuilder: (ctx, i) {
                 final name = filtered[i];
                 final building = AppData.roomBuildings[name] ?? '-';
-                final map = AppData.slotStatus[name]!;
+                final map = AppData.slotStatus[name] ?? {'8-10': 'Free', '10-12': 'Free', '13-15': 'Free', '15-17': 'Free'};
                 final isDisabled = map.values.every((v) => v == 'Disabled');
 
                 return Container(
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    border: Border.all(color: Colors.grey.shade300),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 3))]),
                   child: Row(children: [
-                    CircleAvatar(
-                      backgroundColor:
-                          isDisabled ? Colors.orange.shade300 : Colors.green.shade300,
-                      child: Icon(isDisabled ? Icons.block : Icons.meeting_room,
-                          color: Colors.white),
-                    ),
+                    CircleAvatar(backgroundColor: isDisabled ? Colors.orange.shade300 : Colors.indigo.shade300, child: Icon(isDisabled ? Icons.block : Icons.meeting_room, color: Colors.white)),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(name,
-                              style: const TextStyle(
-                                  fontWeight: FontWeight.bold, fontSize: 16)),
-                          Text(building,
-                              style: const TextStyle(color: Colors.black54, fontSize: 14)),
-                        ],
-                      ),
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        const SizedBox(height: 4),
+                        Text(building, style: const TextStyle(color: Colors.black54)),
+                      ]),
                     ),
-                    IconButton(
-                        icon: const Icon(Icons.edit), onPressed: () => _showEditDialog(name)),
-                    Switch(
-                      value: !isDisabled,
-                      activeColor: Colors.indigo,
-                      onChanged: (val) {
-                        final disableRequested = !val;
-                        if (disableRequested) {
-                          final allFree = map.values.every((v) => v == 'Free');
-                          if (!allFree) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('You can only disable rooms with all slots Free.'),
-                                duration: Duration(seconds: 2),
-                              ),
-                            );
-                            return;
-                          }
-                        }
+                    IconButton(icon: const Icon(Icons.edit), onPressed: () => _showEditDialog(name)),
+                    Column(
+                      children: [
+                        Switch(
+                          value: !isDisabled,
+                          activeColor: Colors.indigo,
+                          onChanged: (val) async {
+                            final disableRequested = !val;
+                            if (disableRequested) {
+                              final allFree = map.values.every((v) => v == 'Free');
+                              if (!allFree) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You can only disable rooms with all slots Free.'), duration: Duration(seconds: 2)));
+                                return;
+                              }
+                            }
 
-                        setState(() {
-                          AppData.staffToggleRoomDisabled(name, disableRequested);
-                        });
-                        widget.onChange();
-                      },
+                            final resp = await AppData.staffToggleRoomDisabled(name, building, disableRequested);
+                            widget.onChange();
+                            setState(() {});
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(resp['msg'] ?? (resp['ok'] == true ? (disableRequested ? 'Room disabled' : 'Room enabled') : 'Failed'))));
+                          },
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isDisabled ? 'Disabled' : 'Enabled',
+                          style: const TextStyle(fontSize: 12, color: Colors.black54),
+                        ),
+                      ],
                     ),
                   ]),
                 );

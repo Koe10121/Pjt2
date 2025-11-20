@@ -1,3 +1,4 @@
+// lib/student/student_browse_room.dart
 import 'package:flutter/material.dart';
 import '../api_service.dart';
 import '../main.dart';
@@ -28,7 +29,6 @@ class _BrowseRoomPageState extends State<BrowseRoomPage> {
   void initState() {
     super.initState();
     _loadRooms();
-    // Auto-refresh every 30s
     Future.doWhile(() async {
       await Future.delayed(const Duration(seconds: 30));
       if (!mounted) return false;
@@ -42,26 +42,31 @@ class _BrowseRoomPageState extends State<BrowseRoomPage> {
 
   Future<void> _loadRooms() async {
     setState(() => loading = true);
+    try {
+      final r = await ApiService.getRooms();
+      final statuses = await ApiService.getRoomStatuses('today');
 
-    final r = await ApiService.getRooms();
-    final statuses = await ApiService.getRoomStatuses(todayDate);
+      final Map<String, Map<String, String>> parsedStatuses = {};
+      statuses.forEach((id, data) {
+        if (data is Map && data['slots'] != null) {
+          parsedStatuses[id.toString()] = Map<String, String>.from(data['slots']);
+        }
+      });
 
-    // 🧠 Convert backend structure to simplified map for each room
-    final Map<String, Map<String, String>> parsedStatuses = {};
-    statuses.forEach((id, data) {
-      if (data is Map && data['slots'] != null) {
-        parsedStatuses[id.toString()] = Map<String, String>.from(data['slots']);
-      }
-    });
-
-    setState(() {
-      rooms = r;
-      roomStatuses = parsedStatuses;
-      loading = false;
-    });
+      setState(() {
+        rooms = r;
+        roomStatuses = parsedStatuses;
+        loading = false;
+      });
+    } on UnauthorizedException {
+      AppData.performLogout(context);
+    } catch (e) {
+      print('_loadRooms error: $e');
+      setState(() => loading = false);
+    }
   }
 
-  void logout(BuildContext context) {
+  void logout(BuildContext context) { /* unchanged - your existing dialog */ 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -75,7 +80,7 @@ class _BrowseRoomPageState extends State<BrowseRoomPage> {
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
-              Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+              AppData.performLogout(context);
             },
             child: const Text('Logout'),
           ),
@@ -126,22 +131,41 @@ class _BrowseRoomPageState extends State<BrowseRoomPage> {
         timeSlot: timeSlot,
         onConfirm: () async {
           Navigator.pop(ctx);
-          final res = await ApiService.bookRoom(
-            widget.userId,
-            roomId,
-            timeSlot,
-          );
-          if (res['ok'] == true) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(res['msg'] ?? "Booking confirmed!")),
+          try {
+            final res = await ApiService.bookRoom(
+              widget.userId,
+              roomId,
+              timeSlot,
             );
-            await _loadRooms();
-          } else {
+            if (res['ok'] == true) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(res['msg'] ?? "Booking confirmed!")),
+              );
+              await _loadRooms();
+            } else {
+              showDialog(
+                context: context,
+                builder: (ctx2) => AlertDialog(
+                  title: const Text('Cannot Book'),
+                  content: Text(res['msg'] ?? "This time slot is unavailable."),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx2),
+                      child: const Text('OK'),
+                    ),
+                  ],
+                ),
+              );
+            }
+          } on UnauthorizedException {
+            AppData.performLogout(context);
+          } catch (e) {
+            print('makeReservation error: $e');
             showDialog(
               context: context,
               builder: (ctx2) => AlertDialog(
-                title: const Text('Cannot Book'),
-                content: Text(res['msg'] ?? "This time slot is unavailable."),
+                title: const Text('Network Error'),
+                content: const Text('Could not reach server.'),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(ctx2),
@@ -158,6 +182,7 @@ class _BrowseRoomPageState extends State<BrowseRoomPage> {
 
   @override
   Widget build(BuildContext context) {
+    // (UI unchanged) — paste your existing build method here (kept as in your file)
     return Scaffold(
       backgroundColor: Colors.indigo[50],
       appBar: AppBar(
@@ -293,6 +318,10 @@ class _BrowseRoomPageState extends State<BrowseRoomPage> {
   }
 }
 
+// RoomCard class: copy your previous RoomCard implementation (unchanged)
+// paste it here exactly as in your original file.
+
+
 class RoomCard extends StatelessWidget {
   final String roomName;
   final String building;
@@ -321,32 +350,53 @@ class RoomCard extends StatelessWidget {
 
     Widget buildSlot(String time) {
       String status = "Free";
-      Color color = Colors.green;
 
+      // Default FREE colors
+      Color borderColor = Colors.green;
+      Color bgColor = Colors.green.withOpacity(0.18);
+      Color textColor = Colors.black;
+
+      // If room is disabled
       if (isDisabled) {
         status = "Disabled";
-        color = Colors.grey;
+        borderColor = Colors.grey;
+        bgColor = Colors.grey.withOpacity(0.22);
+        textColor = Colors.black;
       }
 
+      // Backend statuses override
       final backendStatus = roomStatusesForThisRoom[time];
       if (backendStatus != null) {
-        status = backendStatus as String;
-        if (status == 'Pending') color = Colors.amber;
-        if (status == 'Approved') color = Colors.red;
+        status = backendStatus;
+
+        if (status == "Pending") {
+          borderColor = Colors.amber;
+          bgColor = Colors.amber.withOpacity(0.22);
+          textColor = Colors.black;
+        } else if (status == "Approved") {
+          borderColor = Colors.red;
+          bgColor = Colors.red.withOpacity(0.20);
+          textColor = Colors.black;
+        }
       }
 
+      // Expired Free Slot
       final isPast = isTimePassed(time, currentTime);
-      if (status == "Free" && isPast) color = Colors.grey;
+      if (status == "Free" && isPast) {
+        borderColor = Colors.grey;
+        bgColor = Colors.grey.withOpacity(0.22);
+        textColor = Colors.black;
+      }
 
       return Container(
         margin: const EdgeInsets.symmetric(vertical: 4),
         child: ElevatedButton.icon(
           style: ElevatedButton.styleFrom(
-            backgroundColor: color.withOpacity(0.15),
+            backgroundColor: bgColor,
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(30),
-              side: BorderSide(color: color, width: 1),
+              side: BorderSide(color: borderColor, width: 1),
             ),
           ),
           onPressed: () {
@@ -357,29 +407,28 @@ class RoomCard extends StatelessWidget {
                 context: context,
                 builder: (ctx) => AlertDialog(
                   title: const Text("Time Slot Expired"),
-                  content:
-                      const Text("This time slot can no longer be reserved."),
+                  content: const Text(
+                    "This time slot can no longer be reserved.",
+                  ),
                   actions: [
                     TextButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        child: const Text("OK")),
+                      onPressed: () => Navigator.pop(ctx),
+                      child: const Text("OK"),
+                    ),
                   ],
                 ),
               );
             } else {
               showDialog(
                 context: context,
-                builder: (context) => const RoomUnavailableDialog(),
+                builder: (ctx) => const RoomUnavailableDialog(),
               );
             }
           },
-          icon: Icon(Icons.access_time, size: 18, color: color),
+          icon: Icon(Icons.access_time, size: 18, color: borderColor),
           label: Text(
             "$time  •  ${status == 'Approved' ? 'Reserved' : status}",
-            style: TextStyle(
-              color: color.withOpacity(0.9),
-              fontWeight: FontWeight.w600,
-            ),
+            style: TextStyle(color: textColor, fontWeight: FontWeight.w600),
           ),
         ),
       );
@@ -401,26 +450,46 @@ class RoomCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            Row(children: [
-              const Icon(Icons.meeting_room, color: Colors.indigo),
-              const SizedBox(width: 6),
-              Text(roomName,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 16)),
-            ]),
-            Row(children: [
-              const Icon(Icons.location_city,
-                  size: 18, color: Colors.indigo),
-              const SizedBox(width: 4),
-              Text(building,
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w500, fontSize: 14)),
-            ]),
-          ]),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.meeting_room, color: Colors.indigo),
+                  const SizedBox(width: 6),
+                  Text(
+                    roomName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.location_city,
+                    size: 18,
+                    color: Colors.indigo,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    building,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w500,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
           const Divider(thickness: 1.2),
           const SizedBox(height: 10),
+
+          // Slots
           Wrap(
             spacing: 10,
             runSpacing: 8,

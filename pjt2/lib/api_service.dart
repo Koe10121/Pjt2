@@ -1,55 +1,81 @@
 // lib/api_service.dart
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+
+/// Simple exception type to indicate 401 from the API.
+class UnauthorizedException implements Exception {
+  final String message;
+  UnauthorizedException([this.message = "Unauthorized"]);
+  @override
+  String toString() => "UnauthorizedException: $message";
+}
 
 class ApiService {
-  
+  // Update this if your backend IP/port changes
   static const base = 'http://192.168.1.105:3000';
 
- // 🧑‍🏫 Lecturer: get all pending requests
-  static Future<List<dynamic>> getLecturerRequests() async {
-    try {
-      final res = await http.get(Uri.parse('$base/lecturer/requests'));
-      if (res.statusCode != 200) return [];
-      return jsonDecode(res.body) as List<dynamic>;
-    } catch (e) {
-      print('getLecturerRequests error: $e');
-      return [];
+  // runtime token memory
+  static String? token;
+
+  // ------------------------------
+  // TOKEN + USER LOCAL STORAGE
+  // ------------------------------
+  static Future<void> saveToken(String t) async {
+    final prefs = await SharedPreferences.getInstance();
+    token = t;
+    await prefs.setString("token", t);
+  }
+
+  static Future<void> clearToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove("token");
+    token = null;
+  }
+
+  static Future<void> saveUser(Map<String, dynamic> user) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString("user", jsonEncode(user));
+  }
+
+  static Future<Map<String, dynamic>?> loadUser() async {
+    final prefs = await SharedPreferences.getInstance();
+    final str = prefs.getString("user");
+    if (str == null) return null;
+    return jsonDecode(str) as Map<String, dynamic>;
+  }
+
+  static Future<String?> loadToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    token = prefs.getString("token");
+    return token;
+  }
+
+  static Future<void> clearAll() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.clear();
+    token = null;
+  }
+
+  // ------------------------------
+  // Headers + Unauthorized checks
+  // ------------------------------
+  static Map<String, String> _headers({bool json = true}) {
+    final h = <String, String>{};
+    if (json) h['Content-Type'] = 'application/json';
+    if (token != null) h['Authorization'] = 'Bearer $token';
+    return h;
+  }
+
+  static void _checkAuth(http.Response res) {
+    if (res.statusCode == 401) {
+      throw UnauthorizedException();
     }
   }
 
-  // 🧑‍🏫 Lecturer: approve or reject booking
-  static Future<Map<String, dynamic>> lecturerAction(int lecturerId, int bookingId, String status) async {
-    try {
-      final res = await http.post(
-        Uri.parse('$base/lecturer/action'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'lecturerId': lecturerId,
-          'bookingId': bookingId,
-          'status': status,
-        }),
-      );
-      return jsonDecode(res.body);
-    } catch (e) {
-      print('lecturerAction error: $e');
-      return {'ok': false, 'msg': 'Network error'};
-    }
-  }
-
-  // 🧑‍🏫 Lecturer: get history
-  static Future<List<dynamic>> getLecturerHistory(int lecturerId) async {
-    try {
-      final res = await http.get(Uri.parse('$base/lecturer/history/$lecturerId'));
-      if (res.statusCode != 200) return [];
-      return jsonDecode(res.body) as List<dynamic>;
-    } catch (e) {
-      print('getLecturerHistory error: $e');
-      return [];
-    }
-  }
-
-  // 🧍 LOGIN
+  // ------------------------------
+  // AUTH
+  // ------------------------------
   static Future<Map<String, dynamic>?> login(String username, String password) async {
     try {
       final res = await http.post(
@@ -60,14 +86,17 @@ class ApiService {
       if (res.statusCode != 200) return null;
       final data = jsonDecode(res.body);
       final user = data['user'];
+      final t = data['token'];
+      if (user != null && t != null) {
+        await saveUser(Map<String, dynamic>.from(user));
+        await saveToken(t);
+      }
       return user != null ? Map<String, dynamic>.from(user) : null;
     } catch (e) {
-      print('Login error: $e');
       return null;
     }
   }
 
-  // 📝 REGISTER (student only)
   static Future<bool> register(String username, String password) async {
     try {
       final res = await http.post(
@@ -76,65 +105,206 @@ class ApiService {
         body: jsonEncode({'username': username, 'password': password}),
       );
       if (res.statusCode != 200) return false;
-      final data = jsonDecode(res.body);
-      return data['ok'] == true;
+      return jsonDecode(res.body)['ok'] == true;
     } catch (e) {
-      print('Register error: $e');
       return false;
     }
   }
 
-  // 🏠 Get all rooms
-  static Future<List<dynamic>> getRooms() async {
+  // ------------------------------
+  // ROOMS / BOOKINGS
+  // ------------------------------
+  /// Returns List<Map<String,dynamic>>
+  static Future<List<Map<String, dynamic>>> getRooms() async {
     try {
-      final res = await http.get(Uri.parse('$base/rooms'));
+      final res = await http.get(Uri.parse('$base/rooms'), headers: _headers());
+      _checkAuth(res);
       if (res.statusCode != 200) return [];
-      return jsonDecode(res.body) as List<dynamic>;
+      final parsed = jsonDecode(res.body);
+      if (parsed is List) {
+        return parsed.map((e) => Map<String, dynamic>.from(e)).toList();
+      }
+      return [];
     } catch (e) {
-      print('getRooms error: $e');
+      if (e is UnauthorizedException) rethrow;
       return [];
     }
   }
 
-  // 📖 Get all bookings for a specific user
-  static Future<List<dynamic>> getBookings(int userId) async {
+  /// room-statuses returns a Map keyed by room id
+  static Future<Map<String, dynamic>> getRoomStatuses(String date) async {
     try {
-      final res = await http.get(Uri.parse('$base/bookings/$userId'));
-      if (res.statusCode != 200) return [];
-      return jsonDecode(res.body) as List<dynamic>;
+      final res = await http.get(Uri.parse('$base/room-statuses/$date'), headers: _headers());
+      _checkAuth(res);
+      if (res.statusCode != 200) return {};
+      return jsonDecode(res.body) as Map<String, dynamic>;
     } catch (e) {
-      print('getBookings error: $e');
+      if (e is UnauthorizedException) rethrow;
+      return {};
+    }
+  }
+
+  /// returns List<Map<String,dynamic>> for a user's bookings
+  static Future<List<Map<String, dynamic>>> getBookings(int userId) async {
+    try {
+      final res = await http.get(Uri.parse('$base/bookings/$userId'), headers: _headers());
+      _checkAuth(res);
+      if (res.statusCode != 200) return [];
+      final parsed = jsonDecode(res.body);
+      if (parsed is List) return parsed.map((e) => Map<String, dynamic>.from(e)).toList();
+      return [];
+    } catch (e) {
+      if (e is UnauthorizedException) rethrow;
       return [];
     }
   }
 
-  // 🧾 Book a room
   static Future<Map<String, dynamic>> bookRoom(int userId, int roomId, String timeslot) async {
     try {
       final res = await http.post(
         Uri.parse('$base/book'),
-        headers: {'Content-Type': 'application/json'},
+        headers: _headers(),
         body: jsonEncode({'userId': userId, 'roomId': roomId, 'timeslot': timeslot}),
       );
+      _checkAuth(res);
       return jsonDecode(res.body) as Map<String, dynamic>;
     } catch (e) {
-      print('bookRoom error: $e');
+      if (e is UnauthorizedException) rethrow;
       return {'ok': false, 'msg': 'Network error'};
     }
   }
 
-  // 🕒 NEW: Get room statuses (for showing Pending / Approved / Free)
-  static Future<Map<String, dynamic>> getRoomStatuses(String date) async {
+  // ------------------------------
+  // LECTURER endpoints
+  // ------------------------------
+  static Future<List<Map<String, dynamic>>> getLecturerRequests() async {
     try {
-      final res = await http.get(Uri.parse('$base/room-statuses/$date'));
-      if (res.statusCode != 200) return {};
+      final res = await http.get(Uri.parse('$base/lecturer/requests'), headers: _headers());
+      _checkAuth(res);
+      if (res.statusCode != 200) return [];
+      final parsed = jsonDecode(res.body);
+      if (parsed is List) return parsed.map((e) => Map<String, dynamic>.from(e)).toList();
+      return [];
+    } catch (e) {
+      if (e is UnauthorizedException) rethrow;
+      return [];
+    }
+  }
+
+  static Future<Map<String, dynamic>> lecturerAction(int lecturerId, int bookingId, String status) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$base/lecturer/action'),
+        headers: _headers(),
+        body: jsonEncode({'lecturerId': lecturerId, 'bookingId': bookingId, 'status': status}),
+      );
+      _checkAuth(res);
       return jsonDecode(res.body) as Map<String, dynamic>;
     } catch (e) {
-      print('getRoomStatuses error: $e');
-      return {};
+      if (e is UnauthorizedException) rethrow;
+      return {'ok': false, 'msg': 'Network error'};
+    }
+  }
+
+  /// lecturer history for a lecturer id
+  static Future<List<Map<String, dynamic>>> getLecturerHistory(int lecturerId) async {
+    try {
+      final res = await http.get(Uri.parse('$base/lecturer/history/$lecturerId'), headers: _headers());
+      _checkAuth(res);
+      if (res.statusCode != 200) return [];
+      final parsed = jsonDecode(res.body);
+      if (parsed is List) return parsed.map((e) => Map<String, dynamic>.from(e)).toList();
+      return [];
+    } catch (e) {
+      if (e is UnauthorizedException) rethrow;
+      return [];
+    }
+  }
+
+  // ------------------------------
+  // STAFF: server-backed room management
+  // ------------------------------
+  static Future<Map<String, dynamic>> staffAddRoom(String name, String building) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$base/staff/add-room'),
+        headers: _headers(),
+        body: jsonEncode({'name': name, 'building': building}),
+      );
+      _checkAuth(res);
+      if (res.statusCode != 200) return {'ok': false, 'msg': 'Server error'};
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (e) {
+      if (e is UnauthorizedException) rethrow;
+      return {'ok': false, 'msg': 'Network error'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> staffEditRoom(String oldName, String oldBuilding, String newName, String newBuilding) async {
+    try {
+      final res = await http.post(
+        Uri.parse('$base/staff/edit-room'),
+        headers: _headers(),
+        body: jsonEncode({'oldName': oldName, 'oldBuilding': oldBuilding, 'newName': newName, 'newBuilding': newBuilding}),
+      );
+      _checkAuth(res);
+      if (res.statusCode != 200) return {'ok': false, 'msg': 'Server error'};
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (e) {
+      if (e is UnauthorizedException) rethrow;
+      return {'ok': false, 'msg': 'Network error'};
+    }
+  }
+
+  static Future<Map<String, dynamic>> staffToggleRoom({int? id, String? name, String? building, required bool disable}) async {
+    try {
+      final body = <String, dynamic>{'disable': disable};
+      if (id != null) {
+        body['id'] = id;
+      } else {
+        body['name'] = name;
+        body['building'] = building;
+      }
+      final res = await http.post(
+        Uri.parse('$base/staff/toggle-room'),
+        headers: _headers(),
+        body: jsonEncode(body),
+      );
+      _checkAuth(res);
+      if (res.statusCode != 200) return {'ok': false, 'msg': 'Server error'};
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    } catch (e) {
+      if (e is UnauthorizedException) rethrow;
+      return {'ok': false, 'msg': 'Network error'};
+    }
+  }
+
+  /// Get list of all lecturers (for staff history)
+  static Future<List<Map<String, dynamic>>> getAllLecturers() async {
+    try {
+      final res = await http.get(Uri.parse('$base/staff/all-lecturers'), headers: _headers());
+      _checkAuth(res);
+      if (res.statusCode != 200) return [];
+      final parsed = jsonDecode(res.body);
+      if (parsed is List) return parsed.map((e) => Map<String, dynamic>.from(e)).toList();
+      return [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  /// Staff-only: fetch full history of all lecturers (Approved/Rejected)
+  static Future<List<Map<String, dynamic>>> getAllLecturerHistoryForStaff() async {
+    try {
+      final res = await http.get(Uri.parse('$base/staff/all-lecturer-history'), headers: _headers());
+      _checkAuth(res);
+      if (res.statusCode != 200) return [];
+      final parsed = jsonDecode(res.body);
+      if (parsed is List) return parsed.map((e) => Map<String, dynamic>.from(e)).toList();
+      return [];
+    } catch (e) {
+      if (e is UnauthorizedException) rethrow;
+      return [];
     }
   }
 }
-
-
-

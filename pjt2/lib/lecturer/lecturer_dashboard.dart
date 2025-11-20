@@ -6,45 +6,44 @@ class LecturerDashboardPage extends StatelessWidget {
   final VoidCallback onRefresh;
   const LecturerDashboardPage({required this.onRefresh, super.key});
 
-  int countFree() {
-    int c = 0;
-    AppData.slotStatus.forEach((_, map) {
-      map.forEach((_, status) {
-        if (status == 'Free') c++;
-      });
+int countFree() {
+  int c = 0;
+  AppData.slotStatus.forEach((_, map) {
+    map.forEach((_, status) {
+      if (status == 'Free') c++;
     });
-    return c;
-  }
+  });
+  return c;
+}
 
-  int countPending() {
-    int c = 0;
-    AppData.slotStatus.forEach((_, map) {
-      map.forEach((_, status) {
-        if (status == 'Pending') c++;
-      });
+int countPending() {
+  int c = 0;
+  AppData.slotStatus.forEach((_, map) {
+    map.forEach((_, status) {
+      if (status == 'Pending') c++;
     });
-    return c;
-  }
+  });
+  return c;
+}
 
-  int countReserved() {
-    int c = 0;
-    AppData.slotStatus.forEach((_, map) {
-      map.forEach((_, status) {
-        if (status == 'Reserved' || status == 'Approved') c++;
-      });
+int countReserved() {   // NOW SHOWS APPROVED ONLY
+  int c = 0;
+  AppData.slotStatus.forEach((_, map) {
+    map.forEach((_, status) {
+      if (status == 'Approved') c++;
     });
-    return c;
-  }
+  });
+  return c;
+}
 
-  int countDisabled() {
-    int c = 0;
-    AppData.slotStatus.forEach((_, map) {
-      map.forEach((_, status) {
-        if (status == 'Disabled') c++;
-      });
-    });
-    return c;
-  }
+int countDisabled() {
+  int c = 0;
+  AppData.slotStatus.forEach((_, map) {
+    if (map.values.any((v) => v == 'Disabled')) c++;
+  });
+  return c;
+}
+
 
   @override
   Widget build(BuildContext context) {
