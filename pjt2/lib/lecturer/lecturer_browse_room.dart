@@ -25,119 +25,139 @@ class _LecturerBrowseRoomPageState extends State<LecturerBrowseRoomPage> {
   }
 
   bool isTimePassed(String slotRange, String currentTime) {
-    final parts = slotRange.split('-').map((e) => int.parse(e)).toList();
+    final parts = slotRange.split('-').map(int.parse).toList();
     final endHour = parts[1];
-    final curParts = currentTime.split(":").map(int.parse).toList();
-    final currentTotal = curParts[0] * 60 + curParts[1];
-    final endTotal = endHour * 60;
-    return currentTotal >= (endTotal - 30);
+    final cur = currentTime.split(":").map(int.parse).toList();
+    return (cur[0] * 60 + cur[1]) >= (endHour * 60 - 30);
   }
 
   @override
   Widget build(BuildContext context) {
-    final allRooms = AppData.slotStatus.keys.toList()..sort();
-    final filtered = allRooms
+    final rooms = AppData.slotStatus.keys.toList()..sort();
+    final filtered = rooms
         .where((e) => e.toLowerCase().contains(searchQuery.toLowerCase()))
         .toList();
 
     return Scaffold(
       backgroundColor: Colors.indigo[50],
-      appBar: AppBar(
-        title: const Text(
-          "Browse Rooms (Lecturer)",
-          style: TextStyle(color: Colors.white),
-        ),
-        backgroundColor: Colors.indigo,
-      ),
+
+      
+
+      // ---------------- MAIN CONTENT ----------------
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            _header(),
-            const SizedBox(height: 20),
-            _searchBar(),
+            // WELCOME (same as staff)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF5C6BC0), Color(0xFF3949AB)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Welcome, Lecturer!",
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18)),
+                  SizedBox(height: 6),
+                  Text("MFU Room Reservation — Browse rooms",
+                      style: TextStyle(color: Colors.white70)),
+                ],
+              ),
+            ),
+
             const SizedBox(height: 16),
 
-            if (filtered.isEmpty)
-              const Center(
-                child: Text(
-                  "No rooms found",
-                  style: TextStyle(color: Colors.black54),
+            // DATE & TIME (same as staff)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black12, blurRadius: 6, offset: Offset(0, 3))
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(children: [
+                    const Icon(Icons.calendar_today, color: Colors.indigo),
+                    const SizedBox(width: 8),
+                    Text(todayDate,
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                  ]),
+                  Row(children: [
+                    const Icon(Icons.access_time, color: Colors.indigo),
+                    const SizedBox(width: 8),
+                    Text(currentTime,
+                        style: const TextStyle(fontWeight: FontWeight.w600)),
+                  ]),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // SEARCH BAR
+            TextField(
+              onChanged: (v) => setState(() => searchQuery = v),
+              decoration: InputDecoration(
+                hintText: "Search rooms…",
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
                 ),
               ),
+            ),
 
-            for (var room in filtered)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 18),
-                child: LecturerRoomCard(
-                  roomName: room,
-                  building: AppData.roomBuildings[room] ?? "-",
-                  currentTime: currentTime,
-                  isTimePassed: isTimePassed,
-                  slotStatus: AppData.slotStatus[room] ?? {},
+            const SizedBox(height: 16),
+
+            // ROOM LIST
+            if (filtered.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(22),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
                 ),
+                child: const Center(child: Text("No rooms found")),
+              )
+            else
+              Column(
+                children: [
+                  for (var room in filtered)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 14),
+                      child: LecturerRoomCard(
+                        roomName: room,
+                        building: AppData.roomBuildings[room] ?? "-",
+                        slotStatus: AppData.slotStatus[room] ?? {},
+                        currentTime: currentTime,
+                        isTimePassed: isTimePassed,
+                      ),
+                    ),
+                ],
               ),
           ],
         ),
       ),
     );
   }
-
-  Widget _header() => Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF5C6BC0), Color(0xFF3949AB)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Room Availability Overview",
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 5),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(children: [
-                  const Icon(Icons.calendar_today, color: Colors.white),
-                  const SizedBox(width: 6),
-                  Text(todayDate, style: const TextStyle(color: Colors.white70)),
-                ]),
-                Row(children: [
-                  const Icon(Icons.access_time, color: Colors.white),
-                  const SizedBox(width: 6),
-                  Text(currentTime, style: const TextStyle(color: Colors.white70)),
-                ]),
-              ],
-            ),
-          ],
-        ),
-      );
-
-  Widget _searchBar() => TextField(
-        onChanged: (v) => setState(() => searchQuery = v),
-        decoration: InputDecoration(
-          hintText: "Search rooms...",
-          prefixIcon: const Icon(Icons.search),
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
 }
 
 class LecturerRoomCard extends StatelessWidget {
@@ -158,110 +178,103 @@ class LecturerRoomCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final slots = ["8-10", "10-12", "13-15", "15-17"];
-
     return Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
         color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.15),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 4))
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header (room + building)
+          // HEADER
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  const Icon(Icons.meeting_room, color: Colors.indigo),
-                  const SizedBox(width: 6),
-                  Text(
-                    roomName,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  const Icon(Icons.location_city, size: 18, color: Colors.indigo),
-                  const SizedBox(width: 4),
-                  Text(
-                    building,
-                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-                  ),
-                ],
-              ),
+              Row(children: [
+                const Icon(Icons.meeting_room, color: Colors.indigo),
+                const SizedBox(width: 8),
+                Text(roomName,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold, fontSize: 16)),
+              ]),
+              Row(children: [
+                const Icon(Icons.location_city,
+                    size: 18, color: Colors.indigo),
+                const SizedBox(width: 4),
+                Text(building, style: const TextStyle(color: Colors.black54)),
+              ]),
             ],
           ),
 
           const SizedBox(height: 12),
           const Divider(),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
 
-          // Slots (same student design but disabled)
-          Column(
-            children: slots.map((slot) {
-              final status = slotStatus[slot] ?? "Free";
-              return _disabledSlotButton(slot, status);
-            }).toList(),
+          // -------- SAME 2x2 LAYOUT AS STAFF --------
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _LecturerSlot(label: "8-10", status: slotStatus["8-10"] ?? "Free", current: currentTime, isTimePassed: isTimePassed),
+              _LecturerSlot(label: "10-12", status: slotStatus["10-12"] ?? "Free", current: currentTime, isTimePassed: isTimePassed),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              _LecturerSlot(label: "13-15", status: slotStatus["13-15"] ?? "Free", current: currentTime, isTimePassed: isTimePassed),
+              _LecturerSlot(label: "15-17", status: slotStatus["15-17"] ?? "Free", current: currentTime, isTimePassed: isTimePassed),
+            ],
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _disabledSlotButton(String time, String status) {
-    Color borderColor = Colors.green;
-    Color bgColor = Colors.green.withOpacity(0.18);
-    Color textColor = Colors.black;
+class _LecturerSlot extends StatelessWidget {
+  final String label;
+  final String status;
+  final String current;
+  final bool Function(String, String) isTimePassed;
 
-    if (status == "Pending") {
-      borderColor = Colors.amber;
-      bgColor = Colors.amber.withOpacity(0.22);
-    } else if (status == "Approved") {
-      borderColor = Colors.red;
-      bgColor = Colors.red.withOpacity(0.22);
-    } else if (status == "Disabled") {
-      borderColor = Colors.grey;
-      bgColor = Colors.grey.withOpacity(0.25);
-    }
+  const _LecturerSlot({
+    required this.label,
+    required this.status,
+    required this.current,
+    required this.isTimePassed,
+  });
 
-    final expired = isTimePassed(time, currentTime);
-    if (status == "Free" && expired) {
-      borderColor = Colors.grey;
-      bgColor = Colors.grey.withOpacity(0.22);
-    }
+  @override
+  Widget build(BuildContext context) {
+    String s = status;
+    if (s == "Approved") s = "Reserved";
+
+    Color c = Colors.green;
+    if (s == "Pending") c = Colors.amber;
+    if (s == "Reserved") c = Colors.red;
+    if (s == "Disabled") c = Colors.grey;
+    if (s == "Free" && isTimePassed(label, current)) c = Colors.grey;
 
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      child: ElevatedButton.icon(
-        onPressed: null, // ❌ DISABLED FOR LECTURER
-        style: ElevatedButton.styleFrom(
-          backgroundColor: bgColor,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
-            side: BorderSide(color: borderColor, width: 1),
-          ),
-        ),
-        icon: Icon(Icons.access_time, size: 18, color: borderColor),
-        label: Text(
-          "$time • ${status == 'Approved' ? 'Reserved' : status}",
-          style: TextStyle(
-            color: textColor,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      width: (MediaQuery.of(context).size.width - 80) / 2,
+      decoration: BoxDecoration(
+        color: c.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
       ),
+      child: Row(children: [
+        Icon(Icons.access_time, size: 16, color: c),
+        const SizedBox(width: 8),
+        Text(label,
+            style: TextStyle(fontWeight: FontWeight.bold, color: c)),
+        const SizedBox(width: 8),
+        Text(s, style: const TextStyle(color: Colors.indigo)),
+      ]),
     );
   }
 }

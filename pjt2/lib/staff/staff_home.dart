@@ -31,7 +31,6 @@ class _StaffHomePageState extends State<StaffHomePage> {
               Navigator.pop(ctx);
               AppData.performLogout(context);
             },
-
             child: const Text('Logout'),
           ),
         ],
@@ -57,16 +56,14 @@ class _StaffHomePageState extends State<StaffHomePage> {
         currentIndex: _selectedIndex,
         onTap: (index) => setState(() => _selectedIndex = index),
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.black,
+        backgroundColor: Colors.white,
+        selectedItemColor: Colors.indigo[900],
         unselectedItemColor: Colors.grey,
         items: const [
-          BottomNavigationBarItem(
-            icon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-          BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Browse'),
-          BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Manage'),
-          BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
+          BottomNavigationBarItem(icon: Icon(Icons.dashboard_outlined), label: 'Dashboard'),
+          BottomNavigationBarItem(icon: Icon(Icons.search_outlined), label: 'Browse'),
+          BottomNavigationBarItem(icon: Icon(Icons.settings_outlined), label: 'Manage'),
+          BottomNavigationBarItem(icon: Icon(Icons.history_outlined), label: 'History'),
         ],
       ),
     );
