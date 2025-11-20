@@ -53,55 +53,118 @@ class _StaffDashboardPageState extends State<StaffDashboardPage> {
         foregroundColor: Colors.white,
         centerTitle: true,
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: loading ? null : _refreshOverview),
-          IconButton(icon: const Icon(Icons.logout), onPressed: widget.onLogout),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: loading ? null : _refreshOverview,
+          ),
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: widget.onLogout,
+          ),
         ],
       ),
       body: loading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                // header card
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Color(0xFF5C6BC0), Color(0xFF3949AB)]),
-                    borderRadius: BorderRadius.circular(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // header card
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF5C6BC0), Color(0xFF3949AB)],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Welcome, Staff!",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 6),
+                        Text(
+                          "Manage rooms and view lecturer activity",
+                          style: TextStyle(color: Colors.white70),
+                        ),
+                      ],
+                    ),
                   ),
-                  child: const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(height: 20),
+                  const Text(
+                    "Today's Overview",
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
                     children: [
-                      Text("Welcome, Staff!", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                      SizedBox(height: 6),
-                      Text("Manage rooms and view lecturer activity", style: TextStyle(color: Colors.white70)),
+                      Expanded(
+                        child: _OverviewCard(
+                          icon: Icons.meeting_room,
+                          title: "Free Slots",
+                          value: "$free",
+                          color: Colors.green,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _OverviewCard(
+                          icon: Icons.hourglass_empty,
+                          title: "Pending Slots",
+                          value: "$pending",
+                          color: Colors.amber,
+                        ),
+                      ),
                     ],
                   ),
-                ),
-                const SizedBox(height: 20),
-                const Text("Today's Overview", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-                Row(children: [
-                  Expanded(child: _OverviewCard(icon: Icons.meeting_room, title: "Free Slots", value: "$free", color: Colors.green)),
-                  const SizedBox(width: 12),
-                  Expanded(child: _OverviewCard(icon: Icons.hourglass_empty, title: "Pending Slots", value: "$pending", color: Colors.amber)),
-                ]),
-                const SizedBox(height: 12),
-                Row(children: [
-                  Expanded(child: _OverviewCard(icon: Icons.verified, title: "Approved Slots", value: "$approved", color: Colors.red)),
-                  const SizedBox(width: 12),
-                  Expanded(child: _OverviewCard(icon: Icons.block, title: "Disabled Rooms", value: "$disabled", color: Colors.grey)),
-                ]),
-                const SizedBox(height: 18),
-                Center(
-                  child: TextButton.icon(
-                    onPressed: loading ? null : _refreshOverview,
-                    icon: const Icon(Icons.refresh, color: Colors.indigo),
-                    label: const Text("Refresh Overview", style: TextStyle(color: Colors.indigo, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _OverviewCard(
+                          icon: Icons.verified,
+                          title: "Reserved Slots", // CHANGED
+                          value: "$approved",
+                          color: Colors.red,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _OverviewCard(
+                          icon: Icons.block,
+                          title: "Disabled Rooms",
+                          value: "$disabled",
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
                   ),
-                )
-              ]),
+
+                  const SizedBox(height: 18),
+                  Center(
+                    child: TextButton.icon(
+                      onPressed: loading ? null : _refreshOverview,
+                      icon: const Icon(Icons.refresh, color: Colors.indigo),
+                      label: const Text(
+                        "Refresh Overview",
+                        style: TextStyle(
+                          color: Colors.indigo,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
     );
   }
@@ -112,20 +175,41 @@ class _OverviewCard extends StatelessWidget {
   final String title;
   final String value;
   final Color color;
-  const _OverviewCard({required this.icon, required this.title, required this.value, required this.color, super.key});
+  const _OverviewCard({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.color,
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 3))]),
-      child: Column(children: [
-        Icon(icon, size: 36, color: color),
-        const SizedBox(height: 8),
-        Text(value, style: TextStyle(color: color, fontSize: 22, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 6),
-        Text(title, style: const TextStyle(fontSize: 14)),
-      ]),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 3)),
+        ],
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 36, color: color),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 22,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(title, style: const TextStyle(fontSize: 14)),
+        ],
+      ),
     );
   }
 }
