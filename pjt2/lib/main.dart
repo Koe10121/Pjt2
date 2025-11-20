@@ -141,46 +141,43 @@ class AppData {
   }
 
   // ---------------- STAFF helpers that update local cache ----------------
-  static Future<bool> staffAddRoom(String name, String building) async {
+  static Future<Map<String, dynamic>> staffAddRoom(String name, String building) async {
     try {
       final resp = await ApiService.staffAddRoom(name, building);
       if (resp['ok'] == true) {
         // backend returns id; reload room data to be safe
         await loadRoomData();
-        return true;
       }
-      return false;
+      return resp;
     } catch (e) {
       print("staffAddRoom error: $e");
-      return false;
+      return {'ok': false, 'msg': 'Error'};
     }
   }
 
-  static Future<bool> staffEditRoom(String oldName, String newName, String newBuilding) async {
+  static Future<Map<String, dynamic>> staffEditRoom(String oldName, String oldBuilding, String newName, String newBuilding) async {
     try {
-      final resp = await ApiService.staffEditRoom(oldName, newName, newBuilding);
+      final resp = await ApiService.staffEditRoom(oldName, oldBuilding, newName, newBuilding);
       if (resp['ok'] == true) {
         await loadRoomData();
-        return true;
       }
-      return false;
+      return resp;
     } catch (e) {
       print("staffEditRoom error: $e");
-      return false;
+      return {'ok': false, 'msg': 'Error'};
     }
   }
 
-  static Future<bool> staffToggleRoomDisabled(String roomName, bool disable) async {
+  static Future<Map<String, dynamic>> staffToggleRoomDisabled(String roomName, String building, bool disable) async {
     try {
-      final resp = await ApiService.staffToggleRoom(roomName, disable);
+      final resp = await ApiService.staffToggleRoom(name: roomName, building: building, disable: disable);
       if (resp['ok'] == true) {
         await loadRoomData();
-        return true;
       }
-      return false;
+      return resp;
     } catch (e) {
       print("staffToggleRoomDisabled error: $e");
-      return false;
+      return {'ok': false, 'msg': 'Error'};
     }
   }
 

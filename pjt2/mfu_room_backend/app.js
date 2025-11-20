@@ -432,44 +432,93 @@ app.get("/staff/full-history", verifyTokenMiddleware, ensureStaff, (req, res) =>
 app.post("/staff/add-room", verifyTokenMiddleware, ensureStaff, (req, res) => {
   const { name, building } = req.body;
   if (!name || !building) return res.json({ ok: false, msg: "Missing name or building" });
-
-  const sql = "INSERT INTO rooms (name, building, is_disabled) VALUES (?, ?, 0)";
-  db.query(sql, [name, building], (err) => {
-    if (err) {
-      console.error("add-room error:", err);
-      if (err.code === "ER_DUP_ENTRY") return res.json({ ok: false, msg: "Room already exists" });
-      return res.json({ ok: false, msg: "Database error adding room" });
+  // Check for existing room with same name + building to give a clear error
+  const checkSql = "SELECT id FROM rooms WHERE name = ? AND building = ? LIMIT 1";
+  db.query(checkSql, [name, building], (checkErr, rows) => {
+    if (checkErr) {
+      console.error("add-room check error:", checkErr);
+      return res.json({ ok: false, msg: "Database error" });
     }
-    return res.json({ ok: true, msg: "Room added" });
+    if (rows.length > 0) return res.json({ ok: false, msg: "Room already exists" });
+
+    const sql = "INSERT INTO rooms (name, building, is_disabled) VALUES (?, ?, 0)";
+    db.query(sql, [name, building], (err) => {
+      if (err) {
+        console.error("add-room error:", err);
+        return res.json({ ok: false, msg: "Database error adding room" });
+      }
+      return res.json({ ok: true, msg: "Room added" });
+    });
   });
 });
 
 // ---------------- STAFF: Edit room (by name)
 app.post("/staff/edit-room", verifyTokenMiddleware, ensureStaff, (req, res) => {
-  const { oldName, newName, newBuilding } = req.body;
-  if (!oldName || !newName || !newBuilding) return res.json({ ok: false, msg: "Missing fields" });
+  const { oldName, oldBuilding, newName, newBuilding } = req.body;
+  if (!oldName || !oldBuilding || !newName || !newBuilding) return res.json({ ok: false, msg: "Missing fields" });
 
-  const sql = "UPDATE rooms SET name = ?, building = ? WHERE name = ?";
-  db.query(sql, [newName, newBuilding, oldName], (err, result) => {
-    if (err) {
-      console.error("edit-room error:", err);
-      return res.json({ ok: false, msg: "Database error editing room" });
+  // Find current room id by old name+building
+  const findSql = "SELECT id FROM rooms WHERE name = ? AND building = ? LIMIT 1";
+  db.query(findSql, [oldName, oldBuilding], (findErr, foundRows) => {
+    if (findErr) {
+      console.error("edit-room find error:", findErr);
+      return res.json({ ok: false, msg: "Database error" });
     }
-    if ((result.affectedRows || 0) === 0) return res.json({ ok: false, msg: "Room not found" });
-    return res.json({ ok: true, msg: "Room updated" });
+    if (foundRows.length === 0) return res.json({ ok: false, msg: "Room not found" });
+
+    const currentId = foundRows[0].id;
+
+    // Check if target name+building already exists and is not the same room
+    const dupSql = "SELECT id FROM rooms WHERE name = ? AND building = ? LIMIT 1";
+    db.query(dupSql, [newName, newBuilding], (dupErr, dupRows) => {
+      if (dupErr) {
+        console.error("edit-room dup check error:", dupErr);
+        return res.json({ ok: false, msg: "Database error" });
+      }
+      if (dupRows.length > 0 && dupRows[0].id !== currentId) {
+        return res.json({ ok: false, msg: "Room already exists" });
+      }
+
+      // Safe to update by id
+      const sql = "UPDATE rooms SET name = ?, building = ? WHERE id = ?";
+      db.query(sql, [newName, newBuilding, currentId], (err, result) => {
+        if (err) {
+          console.error("edit-room error:", err);
+          return res.json({ ok: false, msg: "Database error editing room" });
+        }
+        if ((result.affectedRows || 0) === 0) return res.json({ ok: false, msg: "Room not found" });
+        return res.json({ ok: true, msg: "Room updated" });
+      });
+    });
   });
 });
 
 // ---------------- STAFF: Toggle room disabled (by name)
 app.post("/staff/toggle-room", verifyTokenMiddleware, ensureStaff, (req, res) => {
-  const { name, disable } = req.body;
-  if (typeof disable === "undefined" || !name) return res.json({ ok: false, msg: "Missing fields" });
+  // Accept either room id, or name+building to uniquely identify a room
+  const { id, name, building, disable } = req.body;
+  if (typeof disable === "undefined") return res.json({ ok: false, msg: "Missing fields" });
 
   const newVal = disable ? 1 : 0;
-  const sql = "UPDATE rooms SET is_disabled = ? WHERE name = ?";
-  db.query(sql, [newVal, name], (err, result) => {
+
+  if (id) {
+    const sql = "UPDATE rooms SET is_disabled = ? WHERE id = ?";
+    db.query(sql, [newVal, id], (err, result) => {
+      if (err) {
+        console.error("toggle-room error (by id):", err);
+        return res.json({ ok: false, msg: "Database error toggling room" });
+      }
+      if ((result.affectedRows || 0) === 0) return res.json({ ok: false, msg: "Room not found" });
+      return res.json({ ok: true, msg: "Room updated" });
+    });
+    return;
+  }
+
+  if (!name || !building) return res.json({ ok: false, msg: "Missing room identifier" });
+  const sql = "UPDATE rooms SET is_disabled = ? WHERE name = ? AND building = ?";
+  db.query(sql, [newVal, name, building], (err, result) => {
     if (err) {
-      console.error("toggle-room error:", err);
+      console.error("toggle-room error (by name+building):", err);
       return res.json({ ok: false, msg: "Database error toggling room" });
     }
     if ((result.affectedRows || 0) === 0) return res.json({ ok: false, msg: "Room not found" });

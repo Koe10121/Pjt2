@@ -28,9 +28,9 @@ class _StaffManagePageState extends State<StaffManagePage> {
         ]),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(
+              ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
-            onPressed: () {
+            onPressed: () async {
               String name = nameCtrl.text.trim();
               String building = buildingCtrl.text.trim();
               if (name.isEmpty || building.isEmpty) {
@@ -40,10 +40,10 @@ class _StaffManagePageState extends State<StaffManagePage> {
               if (!name.toLowerCase().startsWith('room ')) name = 'Room $name';
               if (!building.toLowerCase().startsWith('building ')) building = 'Building $building';
 
-              // call backend - keep asynchronous but UI remains
-              AppData.staffAddRoom(name, building);
-              widget.onChange();
+              final resp = await AppData.staffAddRoom(name, building);
               Navigator.pop(ctx);
+              widget.onChange();
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(resp['msg'] ?? (resp['ok'] == true ? 'Room added' : 'Failed'))));
             },
             child: const Text('Add Room', style: TextStyle(color: Colors.white)),
           ),
@@ -70,7 +70,7 @@ class _StaffManagePageState extends State<StaffManagePage> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
-            onPressed: () {
+            onPressed: () async {
               String newName = nameCtrl.text.trim();
               String newBuilding = buildingCtrl.text.trim();
               if (newName.isEmpty || newBuilding.isEmpty) {
@@ -80,10 +80,15 @@ class _StaffManagePageState extends State<StaffManagePage> {
               if (!newName.toLowerCase().startsWith('room ')) newName = 'Room $newName';
               if (!newBuilding.toLowerCase().startsWith('building ')) newBuilding = 'Building $newBuilding';
 
-              AppData.staffEditRoom(oldName, newName, newBuilding);
-              widget.onChange();
+              final currentBuilding = AppData.roomBuildings[oldName] ?? '';
+              final ok = await AppData.staffEditRoom(oldName, currentBuilding, newName, newBuilding);
               Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Room updated successfully')));
+              if (ok == true) {
+                widget.onChange();
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Room updated successfully')));
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to update room')));
+              }
             },
             child: const Text('Save', style: TextStyle(color: Colors.white)),
           ),
@@ -150,22 +155,33 @@ class _StaffManagePageState extends State<StaffManagePage> {
                       ]),
                     ),
                     IconButton(icon: const Icon(Icons.edit), onPressed: () => _showEditDialog(name)),
-                    Switch(
-                      value: !isDisabled,
-                      activeColor: Colors.indigo,
-                      onChanged: (val) {
-                        final disableRequested = !val;
-                        if (disableRequested) {
-                          final allFree = map.values.every((v) => v == 'Free');
-                          if (!allFree) {
-                            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You can only disable rooms with all slots Free.'), duration: Duration(seconds: 2)));
-                            return;
-                          }
-                        }
-                        AppData.staffToggleRoomDisabled(name, disableRequested);
-                        widget.onChange();
-                        setState(() {});
-                      },
+                    Column(
+                      children: [
+                        Switch(
+                          value: !isDisabled,
+                          activeColor: Colors.indigo,
+                          onChanged: (val) async {
+                            final disableRequested = !val;
+                            if (disableRequested) {
+                              final allFree = map.values.every((v) => v == 'Free');
+                              if (!allFree) {
+                                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You can only disable rooms with all slots Free.'), duration: Duration(seconds: 2)));
+                                return;
+                              }
+                            }
+
+                            final resp = await AppData.staffToggleRoomDisabled(name, building, disableRequested);
+                            widget.onChange();
+                            setState(() {});
+                            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(resp['msg'] ?? (resp['ok'] == true ? (disableRequested ? 'Room disabled' : 'Room enabled') : 'Failed'))));
+                          },
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          isDisabled ? 'Disabled' : 'Enabled',
+                          style: const TextStyle(fontSize: 12, color: Colors.black54),
+                        ),
+                      ],
                     ),
                   ]),
                 );

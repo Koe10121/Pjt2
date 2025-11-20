@@ -240,12 +240,12 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> staffEditRoom(String oldName, String newName, String newBuilding) async {
+  static Future<Map<String, dynamic>> staffEditRoom(String oldName, String oldBuilding, String newName, String newBuilding) async {
     try {
       final res = await http.post(
         Uri.parse('$base/staff/edit-room'),
         headers: _headers(),
-        body: jsonEncode({'oldName': oldName, 'newName': newName, 'newBuilding': newBuilding}),
+        body: jsonEncode({'oldName': oldName, 'oldBuilding': oldBuilding, 'newName': newName, 'newBuilding': newBuilding}),
       );
       _checkAuth(res);
       if (res.statusCode != 200) return {'ok': false, 'msg': 'Server error'};
@@ -256,12 +256,19 @@ class ApiService {
     }
   }
 
-  static Future<Map<String, dynamic>> staffToggleRoom(String name, bool disable) async {
+  static Future<Map<String, dynamic>> staffToggleRoom({int? id, String? name, String? building, required bool disable}) async {
     try {
+      final body = <String, dynamic>{'disable': disable};
+      if (id != null) {
+        body['id'] = id;
+      } else {
+        body['name'] = name;
+        body['building'] = building;
+      }
       final res = await http.post(
         Uri.parse('$base/staff/toggle-room'),
         headers: _headers(),
-        body: jsonEncode({'name': name, 'disable': disable}),
+        body: jsonEncode(body),
       );
       _checkAuth(res);
       if (res.statusCode != 200) return {'ok': false, 'msg': 'Server error'};
