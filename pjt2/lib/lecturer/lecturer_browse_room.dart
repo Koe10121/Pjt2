@@ -9,8 +9,8 @@ class LecturerBrowseRoomPage extends StatefulWidget {
 }
 
 class _LecturerBrowseRoomPageState extends State<LecturerBrowseRoomPage> {
-  String currentTime = AppData.nowTime();
   String todayDate = AppData.todayDate;
+  String currentTime = AppData.nowTime();
   String searchQuery = "";
 
   @override
@@ -24,49 +24,59 @@ class _LecturerBrowseRoomPageState extends State<LecturerBrowseRoomPage> {
     });
   }
 
-  bool isTimePassed(String slotRange, String current) {
-    final parts = slotRange.split('-').map(int.parse).toList();
-    final end = parts[1] * 60;
-
-    final now = current.split(":").map(int.parse).toList();
-    final cur = now[0] * 60 + now[1];
-
-    return cur >= (end - 30);
+  bool isTimePassed(String slotRange, String currentTime) {
+    final parts = slotRange.split('-').map((e) => int.parse(e)).toList();
+    final endHour = parts[1];
+    final curParts = currentTime.split(":").map(int.parse).toList();
+    final currentTotal = curParts[0] * 60 + curParts[1];
+    final endTotal = endHour * 60;
+    return currentTotal >= (endTotal - 30);
   }
 
   @override
   Widget build(BuildContext context) {
     final allRooms = AppData.slotStatus.keys.toList()..sort();
     final filtered = allRooms
-        .where((r) => r.toLowerCase().contains(searchQuery.toLowerCase()))
+        .where((e) => e.toLowerCase().contains(searchQuery.toLowerCase()))
         .toList();
 
     return Scaffold(
+      backgroundColor: Colors.indigo[50],
+      appBar: AppBar(
+        title: const Text(
+          "Browse Rooms (Lecturer)",
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.indigo,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _header(),
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
             _searchBar(),
             const SizedBox(height: 16),
+
             if (filtered.isEmpty)
-              const Center(child: Text("No rooms found"))
-            else
-              Column(
-                children: [
-                  for (var r in filtered)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: _RoomCard(
-                        roomName: r,
-                        building: AppData.roomBuildings[r] ?? "Unknown",
-                        currentTime: currentTime,
-                        isTimePassed: isTimePassed,
-                      ),
-                    )
-                ],
+              const Center(
+                child: Text(
+                  "No rooms found",
+                  style: TextStyle(color: Colors.black54),
+                ),
+              ),
+
+            for (var room in filtered)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 18),
+                child: LecturerRoomCard(
+                  roomName: room,
+                  building: AppData.roomBuildings[room] ?? "-",
+                  currentTime: currentTime,
+                  isTimePassed: isTimePassed,
+                  slotStatus: AppData.slotStatus[room] ?? {},
+                ),
               ),
           ],
         ),
@@ -76,19 +86,27 @@ class _LecturerBrowseRoomPageState extends State<LecturerBrowseRoomPage> {
 
   Widget _header() => Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.indigo[300],
-          borderRadius: BorderRadius.circular(12),
+          gradient: const LinearGradient(
+            colors: [Color(0xFF5C6BC0), Color(0xFF3949AB)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(14),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              "Browse All Rooms",
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              "Room Availability Overview",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 5),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -111,7 +129,7 @@ class _LecturerBrowseRoomPageState extends State<LecturerBrowseRoomPage> {
   Widget _searchBar() => TextField(
         onChanged: (v) => setState(() => searchQuery = v),
         decoration: InputDecoration(
-          hintText: "Search rooms by name...",
+          hintText: "Search rooms...",
           prefixIcon: const Icon(Icons.search),
           filled: true,
           fillColor: Colors.white,
@@ -122,111 +140,127 @@ class _LecturerBrowseRoomPageState extends State<LecturerBrowseRoomPage> {
       );
 }
 
-class _RoomCard extends StatelessWidget {
-  final String roomName, building, currentTime;
+class LecturerRoomCard extends StatelessWidget {
+  final String roomName;
+  final String building;
+  final String currentTime;
+  final Map<String, String> slotStatus;
   final bool Function(String, String) isTimePassed;
 
-  const _RoomCard({
+  const LecturerRoomCard({
+    super.key,
     required this.roomName,
     required this.building,
     required this.currentTime,
+    required this.slotStatus,
     required this.isTimePassed,
   });
 
-  Color colorFor(String s, String slot) {
-    if (s == 'Approved') return Colors.red;
-    if (s == 'Pending') return Colors.amber;
-    if (s == 'Disabled') return Colors.grey;
-
-    if (s == 'Free') {
-      return (isTimePassed(slot, currentTime)) ? Colors.grey : Colors.green;
-    }
-
-    return Colors.grey;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final map = AppData.slotStatus[roomName]!;
+    final slots = ["8-10", "10-12", "13-15", "15-17"];
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [BoxShadow(color: Colors.black12, blurRadius: 6)],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.15),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header (room + building)
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(children: [
-                const Icon(Icons.meeting_room, color: Colors.indigo),
-                const SizedBox(width: 6),
-                Text(roomName, style: const TextStyle(fontWeight: FontWeight.bold)),
-              ]),
-              Row(children: [
-                const Icon(Icons.location_city, color: Colors.grey),
-                const SizedBox(width: 6),
-                Text(building, style: const TextStyle(color: Colors.black54)),
-              ])
+              Row(
+                children: [
+                  const Icon(Icons.meeting_room, color: Colors.indigo),
+                  const SizedBox(width: 6),
+                  Text(
+                    roomName,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  const Icon(Icons.location_city, size: 18, color: Colors.indigo),
+                  const SizedBox(width: 4),
+                  Text(
+                    building,
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                  ),
+                ],
+              ),
             ],
           ),
-          const SizedBox(height: 10),
+
+          const SizedBox(height: 12),
           const Divider(),
           const SizedBox(height: 10),
-          _slotRow("8-10", map),
-          const SizedBox(height: 8),
-          _slotRow("10-12", map),
-          const SizedBox(height: 8),
-          _slotRow("13-15", map),
-          const SizedBox(height: 8),
-          _slotRow("15-17", map),
+
+          // Slots (same student design but disabled)
+          Column(
+            children: slots.map((slot) {
+              final status = slotStatus[slot] ?? "Free";
+              return _disabledSlotButton(slot, status);
+            }).toList(),
+          ),
         ],
       ),
     );
   }
 
-  Widget _slotRow(String slot, Map<String, String> map) => Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          _SlotBadge(
-            label: slot,
-            status: map[slot] ?? 'Free',
-            color: colorFor(map[slot] ?? 'Free', slot),
-          ),
-        ],
-      );
-}
+  Widget _disabledSlotButton(String time, String status) {
+    Color borderColor = Colors.green;
+    Color bgColor = Colors.green.withOpacity(0.18);
+    Color textColor = Colors.black;
 
-class _SlotBadge extends StatelessWidget {
-  final String label, status;
-  final Color color;
+    if (status == "Pending") {
+      borderColor = Colors.amber;
+      bgColor = Colors.amber.withOpacity(0.22);
+    } else if (status == "Approved") {
+      borderColor = Colors.red;
+      bgColor = Colors.red.withOpacity(0.22);
+    } else if (status == "Disabled") {
+      borderColor = Colors.grey;
+      bgColor = Colors.grey.withOpacity(0.25);
+    }
 
-  const _SlotBadge({
-    required this.label,
-    required this.status,
-    required this.color,
-  });
+    final expired = isTimePassed(time, currentTime);
+    if (status == "Free" && expired) {
+      borderColor = Colors.grey;
+      bgColor = Colors.grey.withOpacity(0.22);
+    }
 
-  @override
-  Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.access_time, size: 16, color: color),
-          const SizedBox(width: 6),
-          Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(width: 6),
-          Text(status, style: const TextStyle(fontWeight: FontWeight.w600)),
-        ],
+      margin: const EdgeInsets.symmetric(vertical: 4),
+      child: ElevatedButton.icon(
+        onPressed: null, // ❌ DISABLED FOR LECTURER
+        style: ElevatedButton.styleFrom(
+          backgroundColor: bgColor,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30),
+            side: BorderSide(color: borderColor, width: 1),
+          ),
+        ),
+        icon: Icon(Icons.access_time, size: 18, color: borderColor),
+        label: Text(
+          "$time • ${status == 'Approved' ? 'Reserved' : status}",
+          style: TextStyle(
+            color: textColor,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ),
     );
   }

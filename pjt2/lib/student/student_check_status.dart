@@ -31,17 +31,19 @@ class _StudentCheckStatusPageState extends State<StudentCheckStatusPage> {
     try {
       final bookings = await ApiService.getBookings(widget.userId);
       final today = AppData.todayDate;
-      final latest = bookings.firstWhere(
-        (b) =>
-            (b['date'] ?? '') == today &&
-            ((b['status'] ?? '') == 'Pending' ||
-                (b['status'] ?? '') == 'Approved' ||
-                (b['status'] ?? '') == 'Rejected'),
-        orElse: () => null,
-      );
+
+      Map<String, dynamic>? latest;
+      for (var b in bookings) {
+        final bDate = b['date'] ?? '';
+        final bStatus = b['status'] ?? '';
+        if (bDate == today && (bStatus == 'Pending' || bStatus == 'Approved' || bStatus == 'Rejected')) {
+          latest = Map<String, dynamic>.from(b);
+          break;
+        }
+      }
+
       setState(() {
-        currentBooking =
-            latest != null ? Map<String, dynamic>.from(latest) : null;
+        currentBooking = latest;
         loading = false;
       });
     } on UnauthorizedException {

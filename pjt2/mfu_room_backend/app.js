@@ -1,4 +1,4 @@
-// app.js
+// app.js (ESM)
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
@@ -50,6 +50,22 @@ function verifyTokenMiddleware(req, res, next) {
   });
 }
 
+// ---------------- ROLE MIDDLEWARE ----------------
+function ensureStaff(req, res, next) {
+  // verifyTokenMiddleware sets req.tokenUser
+  if (!req.tokenUser || req.tokenUser.role !== "staff") {
+    return res.status(403).json({ ok: false, msg: "Staff only." });
+  }
+  next();
+}
+
+function ensureLecturer(req, res, next) {
+  if (!req.tokenUser || req.tokenUser.role !== "lecturer") {
+    return res.status(403).json({ ok: false, msg: "Lecturer only." });
+  }
+  next();
+}
+
 // ---------------- LOGIN ----------------
 app.post("/login", (req, res) => {
   const { username, password } = req.body;
@@ -64,14 +80,14 @@ app.post("/login", (req, res) => {
 
     if (!match) return res.json({ user: null, msg: "Incorrect username or password." });
 
-    // remove password before sending
-    delete user.password;
+    // make safe copy for response
+    const safeUser = { id: user.id, username: user.username, role: user.role };
 
     // generate token
-    const token = generateToken(user);
+    const token = generateToken(safeUser);
 
     // return user and token
-    return res.json({ user, token, msg: "Login successful." });
+    return res.json({ user: safeUser, token, msg: "Login successful." });
   });
 });
 
@@ -114,7 +130,6 @@ app.get("/rooms", verifyTokenMiddleware, (req, res) => {
 });
 
 // ---------------- BOOKINGS (authenticated)
-// Students can only fetch their own bookings. Lecturers can fetch any user's bookings.
 app.get("/bookings/:userId", verifyTokenMiddleware, (req, res) => {
   const tokenUser = req.tokenUser; // { id, role }
   const { userId } = req.params;
@@ -147,7 +162,6 @@ app.get("/bookings/:userId", verifyTokenMiddleware, (req, res) => {
 });
 
 // ---------------- BOOK (authenticated)
-// Only students allowed to create booking for themselves
 app.post("/book", verifyTokenMiddleware, (req, res) => {
   const tokenUser = req.tokenUser; // { id, role }
   const { userId, roomId, timeslot } = req.body;
@@ -253,13 +267,11 @@ app.get("/room-statuses/:date", verifyTokenMiddleware, (req, res) => {
           "15-17": "Disabled"
         };
       } else if (row.timeslot) {
-        // Only block the slot when status is Approved or Pending.
         if (row.status === "Approved") {
           map[rid].slots[row.timeslot] = "Approved";
         } else if (row.status === "Pending") {
           map[rid].slots[row.timeslot] = "Pending";
         } else {
-          // Rejected or other => treat slot as Free
           map[rid].slots[row.timeslot] = "Free";
         }
       }
@@ -269,12 +281,7 @@ app.get("/room-statuses/:date", verifyTokenMiddleware, (req, res) => {
 });
 
 // ---------------- LECTURER: GET TODAY'S PENDING REQUESTS (lecturer only)
-app.get("/lecturer/requests", verifyTokenMiddleware, (req, res) => {
-  const tokenUser = req.tokenUser;
-  if (tokenUser.role !== "lecturer") {
-    return res.status(403).json({ ok: false, msg: "Only lecturers can view requests." });
-  }
-
+app.get("/lecturer/requests", verifyTokenMiddleware, ensureLecturer, (req, res) => {
   const sql = `
     SELECT 
       b.id, 
@@ -301,7 +308,7 @@ app.get("/lecturer/requests", verifyTokenMiddleware, (req, res) => {
 });
 
 // ---------------- LECTURER: APPROVE or REJECT REQUEST (PROTECTED, lecturer only)
-app.post("/lecturer/action", verifyTokenMiddleware, (req, res) => {
+app.post("/lecturer/action", verifyTokenMiddleware, ensureLecturer, (req, res) => {
   const { lecturerId, bookingId, status } = req.body;
 
   if (!lecturerId || !bookingId || !status)
@@ -315,7 +322,6 @@ app.post("/lecturer/action", verifyTokenMiddleware, (req, res) => {
     return res.status(403).json({ ok: false, msg: "Unauthorized: only the logged-in lecturer can perform this action." });
   }
 
-  // Check booking exists and is for today
   const checkBookingSql = `
     SELECT * FROM bookings
     WHERE id = ? AND DATE(date) = CURDATE()
@@ -347,11 +353,10 @@ app.post("/lecturer/action", verifyTokenMiddleware, (req, res) => {
 });
 
 // ---------------- LECTURER: HISTORY (lecturer only)
-app.get("/lecturer/history/:lecturerId", verifyTokenMiddleware, (req, res) => {
-  const tokenUser = req.tokenUser;
+app.get("/lecturer/history/:lecturerId", verifyTokenMiddleware, ensureLecturer, (req, res) => {
   const { lecturerId } = req.params;
   const lid = parseInt(lecturerId, 10);
-
+  const tokenUser = req.tokenUser;
   if (tokenUser.role !== "lecturer" || tokenUser.id !== lid) {
     return res.status(403).json({ ok: false, msg: "Unauthorized: can only view your own history." });
   }
@@ -378,6 +383,121 @@ app.get("/lecturer/history/:lecturerId", verifyTokenMiddleware, (req, res) => {
       console.error("Error fetching lecturer history:", err);
       return res.status(500).json({ ok: false, msg: "Database error fetching lecturer history." });
     }
+    res.json(rows);
+  });
+});
+
+// ---------------- STAFF: Get list of lecturers
+app.get("/staff/all-lecturers", verifyTokenMiddleware, ensureStaff, (req, res) => {
+  db.query(
+    "SELECT id, username FROM users WHERE role = 'lecturer'",
+    (err, rows) => {
+      if (err) return res.status(500).json([]);
+      res.json(rows);
+    }
+  );
+});
+
+// ---------------- STAFF: Full Lecturer History (All Dates)
+app.get("/staff/full-history", verifyTokenMiddleware, ensureStaff, (req, res) => {
+  const sql = `
+    SELECT 
+      b.id,
+      b.timeslot,
+      DATE_FORMAT(b.date, '%Y-%m-%d') AS date,
+      DATE_FORMAT(b.time, '%H:%i') AS time,
+      b.status,
+      r.name AS room,
+      r.building,
+      u.username AS requestedBy,
+      l.username AS lecturer
+    FROM bookings b
+    JOIN rooms r ON b.room_id = r.id
+    JOIN users u ON b.user_id = u.id
+    LEFT JOIN users l ON b.action_by = l.id
+    WHERE b.status IN ('Approved', 'Rejected')
+    ORDER BY b.date DESC, b.id DESC
+  `;
+
+  db.query(sql, (err, rows) => {
+    if (err) {
+      console.error("STAFF full-history error:", err);
+      return res.status(500).json({ ok: false, msg: "Failed to load full history" });
+    }
+    res.json(rows);
+  });
+});
+
+// ---------------- STAFF: Add room
+app.post("/staff/add-room", verifyTokenMiddleware, ensureStaff, (req, res) => {
+  const { name, building } = req.body;
+  if (!name || !building) return res.json({ ok: false, msg: "Missing name or building" });
+
+  const sql = "INSERT INTO rooms (name, building, is_disabled) VALUES (?, ?, 0)";
+  db.query(sql, [name, building], (err) => {
+    if (err) {
+      console.error("add-room error:", err);
+      if (err.code === "ER_DUP_ENTRY") return res.json({ ok: false, msg: "Room already exists" });
+      return res.json({ ok: false, msg: "Database error adding room" });
+    }
+    return res.json({ ok: true, msg: "Room added" });
+  });
+});
+
+// ---------------- STAFF: Edit room (by name)
+app.post("/staff/edit-room", verifyTokenMiddleware, ensureStaff, (req, res) => {
+  const { oldName, newName, newBuilding } = req.body;
+  if (!oldName || !newName || !newBuilding) return res.json({ ok: false, msg: "Missing fields" });
+
+  const sql = "UPDATE rooms SET name = ?, building = ? WHERE name = ?";
+  db.query(sql, [newName, newBuilding, oldName], (err, result) => {
+    if (err) {
+      console.error("edit-room error:", err);
+      return res.json({ ok: false, msg: "Database error editing room" });
+    }
+    if ((result.affectedRows || 0) === 0) return res.json({ ok: false, msg: "Room not found" });
+    return res.json({ ok: true, msg: "Room updated" });
+  });
+});
+
+// ---------------- STAFF: Toggle room disabled (by name)
+app.post("/staff/toggle-room", verifyTokenMiddleware, ensureStaff, (req, res) => {
+  const { name, disable } = req.body;
+  if (typeof disable === "undefined" || !name) return res.json({ ok: false, msg: "Missing fields" });
+
+  const newVal = disable ? 1 : 0;
+  const sql = "UPDATE rooms SET is_disabled = ? WHERE name = ?";
+  db.query(sql, [newVal, name], (err, result) => {
+    if (err) {
+      console.error("toggle-room error:", err);
+      return res.json({ ok: false, msg: "Database error toggling room" });
+    }
+    if ((result.affectedRows || 0) === 0) return res.json({ ok: false, msg: "Room not found" });
+    return res.json({ ok: true, msg: "Room updated" });
+  });
+});
+
+app.get("/staff/all-lecturer-history", verifyTokenMiddleware, ensureStaff, (req, res) => {
+  const sql = `
+    SELECT 
+      b.id,
+      b.timeslot,
+      DATE_FORMAT(b.date, '%Y-%m-%d') AS date,
+      DATE_FORMAT(b.time, '%H:%i') AS time,
+      b.status,
+      r.name AS room,
+      r.building,
+      u.username AS requestedBy,
+      l.username AS lecturer
+    FROM bookings b
+    JOIN rooms r ON b.room_id = r.id
+    JOIN users u ON b.user_id = u.id
+    LEFT JOIN users l ON b.action_by = l.id
+    WHERE b.status IN ('Approved','Rejected')
+    ORDER BY b.date DESC, b.time DESC;
+  `;
+  db.query(sql, (err, rows) => {
+    if (err) return res.status(500).json([]);
     res.json(rows);
   });
 });

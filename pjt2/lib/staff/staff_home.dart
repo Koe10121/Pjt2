@@ -22,12 +22,16 @@ class _StaffHomePageState extends State<StaffHomePage> {
         title: const Text('Confirm Logout'),
         content: const Text('Are you sure you want to logout?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
-              Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+              AppData.performLogout(context);
             },
+
             child: const Text('Logout'),
           ),
         ],
@@ -56,7 +60,10 @@ class _StaffHomePageState extends State<StaffHomePage> {
         selectedItemColor: Colors.black,
         unselectedItemColor: Colors.grey,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Dashboard'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.dashboard),
+            label: 'Dashboard',
+          ),
           BottomNavigationBarItem(icon: Icon(Icons.search), label: 'Browse'),
           BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Manage'),
           BottomNavigationBarItem(icon: Icon(Icons.history), label: 'History'),
